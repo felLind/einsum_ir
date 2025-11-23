@@ -167,8 +167,8 @@ class TensorOperationConfig:
     def __post_init__(self):
         """Validate configuration at creation time."""
         # Validate backend
-        if self.backend is not None and self.backend != "tpp":
-            raise ValueError(f"Unsupported backend: '{self.backend}'. Currently only 'tpp' is supported.")
+        if self.backend is not None and self.backend not in ["tpp", "tpp-mlir"]:
+            raise ValueError(f"Unsupported backend: '{self.backend}'. Supported backends: 'tpp', 'tpp-mlir'.")
 
         # Determine operation type from prim_main
         is_binary = self.prim_main in [PrimType.gemm, PrimType.brgemm]
@@ -316,9 +316,19 @@ class _TPPBackend:
         """
         return _CppOp.get_default_optimization_config("tpp")
 
+class _TPPMlirBackend:
+    """TPP-MLIR backend for tensor operations."""
+    name: str = "tpp-mlir"
+
+    @staticmethod
+    def get_default_optimization_config() -> Dict[str, Union[int, bool]]:
+        """Get default optimization configuration for TPP-MLIR backend."""
+        return _CppOp.get_default_optimization_config("tpp-mlir")
+
 class backend:
     """Namespace for available backends."""
     tpp = _TPPBackend()
+    tpp_mlir = _TPPMlirBackend()
 
 def optimize(
     config: TensorOperationConfig,
@@ -357,6 +367,8 @@ def optimize(
     if optimization_config is None:
         if actual_backend == "tpp":
             optimization_config = backend.tpp.get_default_optimization_config()
+        elif actual_backend == "tpp-mlir":
+            optimization_config = backend.tpp_mlir.get_default_optimization_config()
         else:
             raise ValueError(f"Unknown backend: {actual_backend}")
 

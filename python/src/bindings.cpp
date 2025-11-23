@@ -59,13 +59,8 @@ PYBIND11_MODULE(_etops_core, m) {
         std::vector<int64_t>                           const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides
       ) -> TensorOperation::error_t {
-        // Validate backend
-        if (backend != "tpp") {
-          return TensorOperation::error_t::compilation_failed;
-        }
-
-        // Call TensorOperation setup (TPP backend)
-        return self.setup(dtype, prim_first, prim_main, prim_last,
+        // Call new TensorOperation setup with backend parameter
+        return self.setup(backend, dtype, prim_first, prim_main, prim_last,
                          dim_types, exec_types, dim_sizes, strides);
       },
       R"doc(
@@ -94,7 +89,7 @@ PYBIND11_MODULE(_etops_core, m) {
           TENSOR: 0=in0, 1=in1, 2=out (binary) or 0=in, 1=out (unary)
           DIMENSION: index corresponding to dim_types/dim_sizes
 
-        :param backend: Backend identifier (currently only "tpp" is supported).
+        :param backend: Backend identifier ("tpp" or "tpp-mlir").
         :param dtype: Datatype of all tensor elements.
         :param prim_first: Type of the first touch primitive.
         :param prim_main: Type of the main primitive (determines operation type).
@@ -157,84 +152,9 @@ PYBIND11_MODULE(_etops_core, m) {
         std::vector<std::vector<std::vector<int64_t>>> const & strides,
         py::dict                                       const & optimization_config_dict
       ) -> py::tuple {
-        // Validate backend
-        if( backend != "tpp") {
-          std::vector<std::vector<std::vector<int64_t>>> empty_strides;
-          return py::make_tuple(
-            TensorOperation::error_t::compilation_failed,
-            dtype, prim_first, prim_main, prim_last,
-            dim_types, exec_types, dim_sizes, empty_strides
-          );
-        }
-
-        // Parse the Python dict and create OptimizationConfig struct
-        einsum_ir::py::OptimizationConfig l_optimization_config;
-
-        // Get defaults first
-        l_optimization_config = TensorOperation::get_default_optimization_config();
-
-        // Valid keys for TPP backend
-        std::set<std::string> valid_keys = {
-          "target_m", "target_n", "target_k", "num_threads",
-          "br_gemm_support", "packed_gemm_support", "packing_support",
-          "sfc_support", "l2_cache_size"
-        };
-
-        try {
-          // Check for unknown keys
-          for (auto item : optimization_config_dict) {
-            std::string key = item.first.cast<std::string>();
-            if (valid_keys.find(key) == valid_keys.end()) {
-              // Return error for unknown key
-              std::vector<std::vector<std::vector<int64_t>>> empty_strides;
-              return py::make_tuple(
-                TensorOperation::error_t::invalid_optimization_config,
-                dtype, prim_first, prim_main, prim_last,
-                dim_types, exec_types, dim_sizes, empty_strides
-              );
-            }
-          }
-
-          // Override defaults with provided values
-          if (optimization_config_dict.contains("target_m")) {
-            l_optimization_config.target_m = optimization_config_dict["target_m"].cast<int64_t>();
-          }
-          if (optimization_config_dict.contains("target_n")) {
-            l_optimization_config.target_n = optimization_config_dict["target_n"].cast<int64_t>();
-          }
-          if (optimization_config_dict.contains("target_k")) {
-            l_optimization_config.target_k = optimization_config_dict["target_k"].cast<int64_t>();
-          }
-          if (optimization_config_dict.contains("num_threads")) {
-            l_optimization_config.num_threads = optimization_config_dict["num_threads"].cast<int64_t>();
-          }
-          if (optimization_config_dict.contains("packed_gemm_support")) {
-            l_optimization_config.packed_gemm_support = optimization_config_dict["packed_gemm_support"].cast<bool>();
-          }
-          if (optimization_config_dict.contains("br_gemm_support")) {
-            l_optimization_config.br_gemm_support = optimization_config_dict["br_gemm_support"].cast<bool>();
-          }
-          if (optimization_config_dict.contains("packing_support")) {
-            l_optimization_config.packing_support = optimization_config_dict["packing_support"].cast<bool>();
-          }
-          if (optimization_config_dict.contains("sfc_support")) {
-            l_optimization_config.sfc_support = optimization_config_dict["sfc_support"].cast<bool>();
-          }
-          if (optimization_config_dict.contains("l2_cache_size")) {
-            l_optimization_config.l2_cache_size = optimization_config_dict["l2_cache_size"].cast<int64_t>();
-          }
-        } catch (...) {
-          // Type casting failed
-          std::vector<std::vector<std::vector<int64_t>>> empty_strides;
-          return py::make_tuple(
-            TensorOperation::error_t::invalid_optimization_config,
-            dtype, prim_first, prim_main, prim_last,
-            dim_types, exec_types, dim_sizes, empty_strides
-          );
-        }
-
-        // Call the static optimize function with the struct
+        // Call the new static optimize function with backend and dict
         auto result = TensorOperation::optimize(
+          backend,
           dtype,
           prim_first,
           prim_main,
@@ -243,7 +163,7 @@ PYBIND11_MODULE(_etops_core, m) {
           exec_types,
           dim_sizes,
           strides,
-          l_optimization_config
+          optimization_config_dict
         );
 
         // Return tuple of (error, optimized_parameters)
@@ -274,7 +194,7 @@ PYBIND11_MODULE(_etops_core, m) {
           Uses UnaryOptimizer. Most optimization_config parameters are ignored for unary operations.
           Typically returns 1 level in strides.
 
-        :param backend: Backend identifier (e.g., "tpp").
+        :param backend: Backend identifier ("tpp" or "tpp-mlir").
         :param dtype: Datatype of all tensor elements.
         :param prim_first: Type of the first touch primitive.
         :param prim_main: Type of the main primitive (determines operation type).
@@ -301,32 +221,13 @@ PYBIND11_MODULE(_etops_core, m) {
     .def_static(
       "get_default_optimization_config",
       [](std::string const & backend) -> py::dict {
-        // Validate backend
-        if( backend != "tpp" ) {
-          return py::dict();
-        }
-
-        // Get the struct from C++ (TPP backend)
-        auto l_config = TensorOperation::get_default_optimization_config();
-
-        // Convert to Python dict
-        py::dict result;
-        result["target_m"]            = l_config.target_m;
-        result["target_n"]            = l_config.target_n;
-        result["target_k"]            = l_config.target_k;
-        result["num_threads"]         = l_config.num_threads;
-        result["packed_gemm_support"] = l_config.packed_gemm_support;
-        result["br_gemm_support"]     = l_config.br_gemm_support;
-        result["packing_support"]     = l_config.packing_support;
-        result["sfc_support"]         = l_config.sfc_support;
-        result["l2_cache_size"]       = l_config.l2_cache_size;
-
-        return result;
+        // Call the new static get_default_optimization_config with backend
+        return TensorOperation::get_default_optimization_config(backend);
       },
       R"doc(
         Get default optimization configuration for a backend.
 
-        :param backend: Backend identifier (currently only "tpp" is supported).
+        :param backend: Backend identifier ("tpp" or "tpp-mlir").
         :return: Dictionary containing default optimization parameters for the backend.
       )doc",
       py::arg("backend")

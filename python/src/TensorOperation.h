@@ -3,29 +3,23 @@
 
 #include <cstdint>
 #include <vector>
-#include <einsum_ir/basic/unary/UnaryBackendTpp.h>
-#include <einsum_ir/basic/unary/UnaryOptimizer.h>
-#include <einsum_ir/basic/binary/ContractionBackendTpp.h>
-#include <einsum_ir/basic/binary/ContractionOptimizer.h>
+#include <memory>
+#include <string>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
+namespace py = pybind11;
+
+// Forward declarations for backend system
+namespace einsum_ir {
+  namespace py {
+    class BackendInterface;
+  }
+}
 
 namespace einsum_ir {
   namespace py {
     class TensorOperation;
-
-    /**
-     * Backend-specific optimization parameters.
-     */
-    struct OptimizationConfig {
-      int64_t target_m            = 0;
-      int64_t target_n            = 0;
-      int64_t target_k            = 0;
-      int64_t num_threads         = 0;
-      bool    br_gemm_support     = false;
-      bool    packed_gemm_support = false;
-      bool    packing_support     = false;
-      bool    sfc_support         = false;
-      int64_t l2_cache_size       = 0;
-    };
   }
 }
 
@@ -81,13 +75,14 @@ class einsum_ir::py::TensorOperation {
       invalid_optimization_config = 3
     };
 
-    op_type_t m_op_type = op_type_t::undefined;
-    einsum_ir::basic::UnaryBackendTpp m_backend_unary;
-    einsum_ir::basic::ContractionBackendTpp m_backend_binary;
+    // Backend system
+    std::unique_ptr<BackendInterface> m_backend_interface;
+    std::string m_backend_name;
 
     /**
-     * Setup for a binary tensor contraction or a unary tensor operation.
+     * Setup for a binary tensor contraction or a unary tensor operation with backend selection.
      *
+     * @param backend    Backend identifier ("tpp" or "tpp-mlir"). Defaults to "tpp" for backwards compatibility.
      * @param dtype      Datatype of all tensor elements.
      * @param prim_first Type of the first touch primitive.
      * @param prim_main  Type of the main primitive (determines operation type).
@@ -102,14 +97,40 @@ class einsum_ir::py::TensorOperation {
      * @return           Appropriate error code.
      **/
     error_t setup(
-      dtype_t                                                      dtype,
-      prim_t                                                       prim_first,
-      prim_t                                                       prim_main,
-      prim_t                                                       prim_last,
-      std::vector< dim_t >                                 const & dim_types,
-      std::vector< exec_t >                                const & exec_types,
-      std::vector< int64_t >                               const & dim_sizes,
-      std::vector< std::vector< std::vector< int64_t > > > const & strides
+      std::string const & backend,
+      dtype_t dtype,
+      prim_t prim_first,
+      prim_t prim_main,
+      prim_t prim_last,
+      std::vector<dim_t> const & dim_types,
+      std::vector<exec_t> const & exec_types,
+      std::vector<int64_t> const & dim_sizes,
+      std::vector<std::vector<std::vector<int64_t>>> const & strides
+    );
+
+    /**
+     * Setup for a binary tensor contraction or a unary tensor operation (legacy method for backwards compatibility).
+     * Uses "tpp" backend by default.
+     *
+     * @param dtype      Datatype of all tensor elements.
+     * @param prim_first Type of the first touch primitive.
+     * @param prim_main  Type of the main primitive (determines operation type).
+     * @param prim_last  Type of the last touch primitive.
+     * @param dim_types  Dimension types.
+     * @param exec_types Execution type of the dimensions (prim, seq, shared, or sfc).
+     * @param dim_sizes  Sizes of the dimensions.
+     * @param strides    3D stride tensor: [LEVEL][TENSOR][DIMENSION]
+     * @return           Appropriate error code.
+     **/
+    error_t setup(
+      dtype_t dtype,
+      prim_t prim_first,
+      prim_t prim_main,
+      prim_t prim_last,
+      std::vector<dim_t> const & dim_types,
+      std::vector<exec_t> const & exec_types,
+      std::vector<int64_t> const & dim_sizes,
+      std::vector<std::vector<std::vector<int64_t>>> const & strides
     );
 
     /**
@@ -124,12 +145,13 @@ class einsum_ir::py::TensorOperation {
                   void       * tensor_out );
 
     /**
-     * Optimizes a tensor operation configuration.
+     * Optimizes a tensor operation configuration with backend selection.
      *
      * The operation type is automatically determined from prim_main.
      * For binary operations, may add packing levels if optimization determines it beneficial.
      * For unary operations, returns single level.
      *
+     * @param backend             Backend identifier ("tpp" or "tpp-mlir").
      * @param dtype               Datatype of all tensor elements.
      * @param prim_first          Type of the first touch primitive.
      * @param prim_main           Type of the main primitive.
@@ -148,274 +170,36 @@ class einsum_ir::py::TensorOperation {
       prim_t,
       prim_t,
       prim_t,
-      std::vector< dim_t >,
-      std::vector< exec_t >,
-      std::vector< int64_t >,
-      std::vector< std::vector< std::vector< int64_t > > >
+      std::vector<dim_t>,
+      std::vector<exec_t>,
+      std::vector<int64_t>,
+      std::vector<std::vector<std::vector<int64_t>>>
     > optimize(
-      dtype_t                                                      dtype,
-      prim_t                                                       prim_first,
-      prim_t                                                       prim_main,
-      prim_t                                                       prim_last,
-      std::vector< dim_t >                                 const & dim_types,
-      std::vector< exec_t >                                const & exec_types,
-      std::vector< int64_t >                               const & dim_sizes,
-      std::vector< std::vector< std::vector< int64_t > > > const & strides,
-      OptimizationConfig                                   const & optimization_config
-    );
-
-    /**
-     * Get default optimization configuration.
-     *
-     * @return Default optimization parameters for the TPP backend.
-     **/
-    static OptimizationConfig get_default_optimization_config();
-
-  private:
-    /**
-     * Helper function to convert TensorOperation execution types to backend execution types.
-     *
-     * @param exec_type TensorOperation execution type.
-     * @return          Backend execution type.
-     **/
-    static inline einsum_ir::basic::exec_t convert_exec_type( exec_t exec_type );
-
-    /**
-     * Helper function to convert backend execution types back to TensorOperation execution types.
-     *
-     * @param exec_type Backend execution type.
-     * @return          TensorOperation execution type.
-     **/
-    static inline exec_t convert_exec_type_back( einsum_ir::basic::exec_t exec_type );
-
-    /**
-     * Helper function to convert TensorOperation dimension types to backend dimension types.
-     *
-     * @param dim_type TensorOperation dimension type.
-     * @return         Backend dimension type.
-     **/
-    static inline einsum_ir::basic::dim_t convert_dim_type( dim_t dim_type );
-
-    /**
-     * Helper function to convert backend dimension types back to TensorOperation dimension types.
-     *
-     * @param dim_type Backend dimension type.
-     * @return         TensorOperation dimension type.
-     **/
-    static inline dim_t convert_dim_type_back( einsum_ir::basic::dim_t dim_type );
-
-    /**
-     * Helper function to convert primitive types to backend kernel types.
-     *
-     * @param prim_type TensorOperation primitive type.
-     * @return          Backend kernel type.
-     **/
-    static inline einsum_ir::basic::kernel_t convert_prim_to_kernel( prim_t prim_type );
-
-    /**
-     * Helper function to create iter_property vector from input parameters.
-     *
-     * @param dim_types   Dimension types vector.
-     * @param exec_types  Execution types vector.
-     * @param dim_sizes   Dimension sizes vector.
-     * @param strides_in0 Strides for first input tensor.
-     * @param strides_in1 Strides for second input tensor.
-     * @param strides_out Strides for output tensor.
-     * @return            Vector of iteration properties.
-     **/
-    static inline std::vector<einsum_ir::basic::iter_property> create_iter_properties(
-      std::vector<dim_t>   const & dim_types,
-      std::vector<exec_t>  const & exec_types,
+      std::string const & backend,
+      dtype_t dtype,
+      prim_t prim_first,
+      prim_t prim_main,
+      prim_t prim_last,
+      std::vector<dim_t> const & dim_types,
+      std::vector<exec_t> const & exec_types,
       std::vector<int64_t> const & dim_sizes,
-      std::vector<int64_t> const & strides_in0,
-      std::vector<int64_t> const & strides_in1,
-      std::vector<int64_t> const & strides_out
+      std::vector<std::vector<std::vector<int64_t>>> const & strides,
+      py::dict const & optimization_config
     );
 
-    /**
-     * Helper function to update parameters from optimized iter_property vector.
-     *
-     * @param iters       Optimized iteration properties vector.
-     * @param dim_types   Output dimension types vector.
-     * @param exec_types  Output execution types vector.
-     * @param dim_sizes   Output dimension sizes vector.
-     * @param strides_in0 Output strides for first input tensor.
-     * @param strides_in1 Output strides for second input tensor.
-     * @param strides_out Output strides for output tensor.
-     * @param packing_in0 Output packing strides for first input tensor.
-     * @param packing_in1 Output packing strides for second input tensor.
-     **/
-    static inline void update_parameters_from_iters(
-      std::vector<einsum_ir::basic::iter_property> const & iters,
-      std::vector<dim_t>                                  & dim_types,
-      std::vector<exec_t>                                 & exec_types,
-      std::vector<int64_t>                                & dim_sizes,
-      std::vector<int64_t>                                & strides_in0,
-      std::vector<int64_t>                                & strides_in1,
-      std::vector<int64_t>                                & strides_out,
-      std::vector<int64_t>                                & packing_in0,
-      std::vector<int64_t>                                & packing_in1
-    );
+
 
     /**
-     * Converts TensorOperation dtype to number of bytes.
+     * Get default optimization configuration for a backend.
      *
-     * @param dtype TensorOperation data type.
-     * @return      Number of bytes for the given data type.
+     * @param backend Backend identifier ("tpp" or "tpp-mlir").
+     * @return        Default optimization parameters for the backend.
      **/
-    static inline int64_t dtype_to_num_bytes( dtype_t dtype );
+    static py::dict get_default_optimization_config(std::string const & backend);
 
-    /**
-     * Determines operation type based on primitive type.
-     *
-     * @param prim_main Main primitive type.
-     * @return          Operation type (binary, unary, or undefined).
-     **/
-    static inline op_type_t determine_op_type( prim_t prim_main );
 
-    /**
-     * Determines number of threads (handles OpenMP detection).
-     *
-     * @param num_threads Requested threads (<=0 means auto-detect).
-     * @return            Actual number of threads to use.
-     **/
-    static inline int64_t get_num_threads( int64_t num_threads );
 
-    /**
-     * Calculate SFC dimension sizes from configuration.
-     *
-     * Iterates through dim_types and exec_types to find SFC dimensions
-     * and compute their combined sizes for M and N dimensions.
-     *
-     * @param dim_types    Dimension types vector.
-     * @param exec_types   Execution types vector.
-     * @param dim_sizes    Dimension sizes vector.
-     * @param o_size_sfc_m Combined size of all SFC M dimensions.
-     * @param o_size_sfc_n Combined size of all SFC N dimensions.
-     **/
-    static void calculate_sfc_sizes(
-      std::vector< dim_t >   const & dim_types,
-      std::vector< exec_t >  const & exec_types,
-      std::vector< int64_t > const & dim_sizes,
-      int64_t                      & o_size_sfc_m,
-      int64_t                      & o_size_sfc_n
-    );
 
-    /**
-     * Setup for unary operations.
-     *
-     * @param dtype       Datatype of tensor elements.
-     * @param prim_main   Type of the main primitive.
-     * @param exec_types  Execution types.
-     * @param dim_sizes   Sizes of dimensions.
-     * @param strides_in0 Strides of input tensor.
-     * @param strides_out Strides of output tensor.
-     * @return            Appropriate error code.
-     **/
-    error_t setup_unary(
-      dtype_t                        dtype,
-      prim_t                         prim_main,
-      std::vector< exec_t >  const & exec_types,
-      std::vector< int64_t > const & dim_sizes,
-      std::vector< int64_t > const & strides_in0,
-      std::vector< int64_t > const & strides_out
-    );
-
-    /**
-     * Setup for binary operations.
-     *
-     * @param dtype       Datatype of tensor elements.
-     * @param prim_first  Type of the first touch primitive.
-     * @param prim_main   Type of the main primitive.
-     * @param prim_last   Type of the last touch primitive.
-     * @param dim_types   Dimension types.
-     * @param exec_types  Execution types.
-     * @param dim_sizes   Sizes of dimensions.
-     * @param strides     3D stride tensor [LEVEL][TENSOR][DIMENSION].
-     * @return            Appropriate error code.
-     **/
-    error_t setup_binary(
-      dtype_t                                                      dtype,
-      prim_t                                                       prim_first,
-      prim_t                                                       prim_main,
-      prim_t                                                       prim_last,
-      std::vector< dim_t >                                 const & dim_types,
-      std::vector< exec_t >                                const & exec_types,
-      std::vector< int64_t >                               const & dim_sizes,
-      std::vector< std::vector< std::vector< int64_t > > > const & strides
-    );
-
-    /**
-     * Optimize unary operation configuration.
-     *
-     * @param dtype         Datatype of tensor elements.
-     * @param prim_main     Type of the main primitive.
-     * @param dim_types     Dimension types.
-     * @param exec_types    Execution types.
-     * @param dim_sizes     Sizes of dimensions.
-     * @param strides_in0   Strides of input tensor.
-     * @param strides_out   Strides of output tensor.
-     * @param num_threads   Number of threads.
-     * @return              Appropriate error code.
-     **/
-    static error_t optimize_unary(
-      dtype_t                  dtype,
-      prim_t                 & prim_main,
-      std::vector< dim_t >   & dim_types,
-      std::vector< exec_t >  & exec_types,
-      std::vector< int64_t > & dim_sizes,
-      std::vector< int64_t > & strides_in0,
-      std::vector< int64_t > & strides_out,
-      int64_t                  num_threads
-    );
-
-    /**
-     * Optimize binary operation configuration.
-     *
-     * @param dtype               Datatype of tensor elements.
-     * @param prim_first          Type of the first touch primitive.
-     * @param prim_main           Type of the main primitive.
-     * @param prim_last           Type of the last touch primitive.
-     * @param dim_types           Dimension types.
-     * @param exec_types          Execution types.
-     * @param dim_sizes           Sizes of dimensions.
-     * @param strides_in0         Strides of first input tensor.
-     * @param strides_in1         Strides of second input tensor.
-     * @param strides_out         Strides of output tensor.
-     * @param packing_in0         Packing strides for first input tensor (output).
-     * @param packing_in1         Packing strides for second input tensor (output).
-     * @param target_m            Target M block size.
-     * @param target_n            Target N block size.
-     * @param target_k            Target K block size.
-     * @param num_threads         Number of threads: [0]: shared, [1]: SFC M, [2]: SFC N.
-     * @param packed_gemm_support Whether to enable packed GEMM support.
-     * @param br_gemm_support     Whether to enable batch-reduce GEMM support.
-     * @param packing_support     Whether to enable packing support.
-     * @param sfc_support         Whether to enable SFC support.
-     * @param l2_cache_size       Size of L2 cache in bytes.
-     * @return                    Appropriate error code.
-     **/
-    static error_t optimize_binary(
-      dtype_t                  dtype,
-      prim_t                 & prim_main,
-      std::vector< dim_t >   & dim_types,
-      std::vector< exec_t >  & exec_types,
-      std::vector< int64_t > & dim_sizes,
-      std::vector< int64_t > & strides_in0,
-      std::vector< int64_t > & strides_in1,
-      std::vector< int64_t > & strides_out,
-      std::vector< int64_t > & packing_in0,
-      std::vector< int64_t > & packing_in1,
-      int64_t                  target_m,
-      int64_t                  target_n,
-      int64_t                  target_k,
-      int64_t                  num_threads[3],
-      bool                     packed_gemm_support,
-      bool                     br_gemm_support,
-      bool                     packing_support,
-      bool                     sfc_support,
-      int64_t                  l2_cache_size
-    );
 };
 
 #endif
