@@ -5,10 +5,8 @@
 #include <vector>
 #include <memory>
 #include <string>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 
-namespace py = pybind11;
+#include "BackendInterface.h"
 
 // Forward declarations for backend system
 namespace einsum_ir {
@@ -25,56 +23,6 @@ namespace einsum_ir {
 
 class einsum_ir::py::TensorOperation {
   public:
-    /// operation type
-    enum class op_type_t : uint32_t {
-      binary    = 0,
-      unary     = 1,
-      undefined = 99
-    };
-
-    /// execution type
-    enum class exec_t : uint32_t {
-      seq       = 0, 
-      prim      = 1,
-      shared    = 2,
-      sfc       = 3,
-      undefined = 99
-    };
-
-    /// primitive type
-    enum class prim_t : uint32_t {
-      none      =  0,
-      zero      =  1,
-      copy      =  2,
-      relu      =  3,
-      gemm      =  4,
-      brgemm    =  5,
-      undefined = 99
-    };
-
-    /// dimension type
-    enum class dim_t : uint32_t {
-      c         = 0, 
-      m         = 1, 
-      n         = 2, 
-      k         = 3, 
-      undefined = 99
-    };
-
-    /// data type
-    enum class dtype_t : uint32_t {
-      fp32 = 0,
-      fp64 = 1
-    };
-
-    /// error codes
-    enum class error_t : int32_t {
-      success                     = 0,
-      compilation_failed          = 1,
-      invalid_stride_shape        = 2,
-      invalid_optimization_config = 3
-    };
-
     // Backend system
     std::unique_ptr<BackendInterface> m_backend_interface;
     std::string m_backend_name;
@@ -184,7 +132,7 @@ class einsum_ir::py::TensorOperation {
       std::vector<exec_t> const & exec_types,
       std::vector<int64_t> const & dim_sizes,
       std::vector<std::vector<std::vector<int64_t>>> const & strides,
-      py::dict const & optimization_config
+      einsum_ir::py::OptimizationConfig const & optimization_config
     );
 
 
@@ -195,11 +143,7 @@ class einsum_ir::py::TensorOperation {
      * @param backend Backend identifier ("tpp" or "tpp-mlir").
      * @return        Default optimization parameters for the backend.
      **/
-    static py::dict get_default_optimization_config(std::string const & backend);
-
-
-
-
+    static einsum_ir::py::OptimizationConfig get_default_optimization_config(std::string const & backend);
 };
 
 #endif

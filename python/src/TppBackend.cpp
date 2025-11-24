@@ -1,8 +1,5 @@
 #include "TppBackend.h"
 #include <set>
-#include <pybind11/stl.h>
-
-namespace py = pybind11;
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -12,16 +9,16 @@ namespace einsum_ir {
 namespace py {
 
 // Helper functions moved from TensorOperation
-TensorOperation::op_type_t determine_op_type(TensorOperation::prim_t prim_main) {
+op_type_t determine_op_type(prim_t prim_main) {
   switch (prim_main) {
-    case TensorOperation::prim_t::zero:
-    case TensorOperation::prim_t::copy:
-      return TensorOperation::op_type_t::unary;
-    case TensorOperation::prim_t::gemm:
-    case TensorOperation::prim_t::brgemm:
-      return TensorOperation::op_type_t::binary;
+    case prim_t::zero:
+    case prim_t::copy:
+      return op_type_t::unary;
+    case prim_t::gemm:
+    case prim_t::brgemm:
+      return op_type_t::binary;
     default:
-      return TensorOperation::op_type_t::undefined;
+      return op_type_t::undefined;
   }
 }
 
@@ -39,62 +36,62 @@ int64_t get_num_threads(int64_t num_threads) {
   return l_num_threads;
 }
 
-einsum_ir::basic::exec_t convert_exec_type(TensorOperation::exec_t exec_type) {
+einsum_ir::basic::exec_t convert_exec_type(exec_t exec_type) {
   switch (exec_type) {
-    case TensorOperation::exec_t::seq:      return einsum_ir::basic::exec_t::SEQ;
-    case TensorOperation::exec_t::prim:     return einsum_ir::basic::exec_t::PRIM;
-    case TensorOperation::exec_t::shared:   return einsum_ir::basic::exec_t::OMP;
-    case TensorOperation::exec_t::sfc:      return einsum_ir::basic::exec_t::SFC;
+    case exec_t::seq:      return einsum_ir::basic::exec_t::SEQ;
+    case exec_t::prim:     return einsum_ir::basic::exec_t::PRIM;
+    case exec_t::shared:   return einsum_ir::basic::exec_t::OMP;
+    case exec_t::sfc:      return einsum_ir::basic::exec_t::SFC;
     default:                                return einsum_ir::basic::exec_t::UNDEFINED_EXECTYPE;
   }
 }
 
-einsum_ir::basic::dim_t convert_dim_type(TensorOperation::dim_t dim_type) {
+einsum_ir::basic::dim_t convert_dim_type(dim_t dim_type) {
   switch (dim_type) {
-    case TensorOperation::dim_t::c:         return einsum_ir::basic::dim_t::C;
-    case TensorOperation::dim_t::m:         return einsum_ir::basic::dim_t::M;
-    case TensorOperation::dim_t::n:         return einsum_ir::basic::dim_t::N;    
-    case TensorOperation::dim_t::k:         return einsum_ir::basic::dim_t::K;
+    case dim_t::c:         return einsum_ir::basic::dim_t::C;
+    case dim_t::m:         return einsum_ir::basic::dim_t::M;
+    case dim_t::n:         return einsum_ir::basic::dim_t::N;    
+    case dim_t::k:         return einsum_ir::basic::dim_t::K;
     default:                                return einsum_ir::basic::dim_t::UNDEFINED_DIM;
   }
 }
 
-einsum_ir::basic::kernel_t convert_prim_to_kernel(TensorOperation::prim_t prim_type) {
+einsum_ir::basic::kernel_t convert_prim_to_kernel(prim_t prim_type) {
   switch (prim_type) {
-    case TensorOperation::prim_t::zero:     return einsum_ir::basic::kernel_t::ZERO;
-    case TensorOperation::prim_t::copy:     return einsum_ir::basic::kernel_t::COPY;
-    case TensorOperation::prim_t::relu:     return einsum_ir::basic::kernel_t::RELU;
-    case TensorOperation::prim_t::gemm:     return einsum_ir::basic::kernel_t::MADD;
-    case TensorOperation::prim_t::brgemm:   return einsum_ir::basic::kernel_t::BR_MADD;
+    case prim_t::zero:     return einsum_ir::basic::kernel_t::ZERO;
+    case prim_t::copy:     return einsum_ir::basic::kernel_t::COPY;
+    case prim_t::relu:     return einsum_ir::basic::kernel_t::RELU;
+    case prim_t::gemm:     return einsum_ir::basic::kernel_t::MADD;
+    case prim_t::brgemm:   return einsum_ir::basic::kernel_t::BR_MADD;
     default:                                return einsum_ir::basic::kernel_t::UNDEFINED_KTYPE;
   }
 }
 
 // Reverse conversion functions
-TensorOperation::exec_t convert_exec_type_back(einsum_ir::basic::exec_t exec_type) {
+exec_t convert_exec_type_back(einsum_ir::basic::exec_t exec_type) {
   switch (exec_type) {
-    case einsum_ir::basic::exec_t::SEQ:  return TensorOperation::exec_t::seq;
-    case einsum_ir::basic::exec_t::PRIM: return TensorOperation::exec_t::prim;
-    case einsum_ir::basic::exec_t::OMP:  return TensorOperation::exec_t::shared;
-    case einsum_ir::basic::exec_t::SFC:  return TensorOperation::exec_t::sfc;
-    default:                             return TensorOperation::exec_t::undefined;
+    case einsum_ir::basic::exec_t::SEQ:  return exec_t::seq;
+    case einsum_ir::basic::exec_t::PRIM: return exec_t::prim;
+    case einsum_ir::basic::exec_t::OMP:  return exec_t::shared;
+    case einsum_ir::basic::exec_t::SFC:  return exec_t::sfc;
+    default:                             return exec_t::undefined;
   }
 }
 
-TensorOperation::dim_t convert_dim_type_back(einsum_ir::basic::dim_t dim_type) {
+dim_t convert_dim_type_back(einsum_ir::basic::dim_t dim_type) {
   switch (dim_type) {
-    case einsum_ir::basic::dim_t::C: return TensorOperation::dim_t::c;
-    case einsum_ir::basic::dim_t::M: return TensorOperation::dim_t::m;
-    case einsum_ir::basic::dim_t::N: return TensorOperation::dim_t::n;
-    case einsum_ir::basic::dim_t::K: return TensorOperation::dim_t::k;
-    default:                         return TensorOperation::dim_t::undefined;
+    case einsum_ir::basic::dim_t::C: return dim_t::c;
+    case einsum_ir::basic::dim_t::M: return dim_t::m;
+    case einsum_ir::basic::dim_t::N: return dim_t::n;
+    case einsum_ir::basic::dim_t::K: return dim_t::k;
+    default:                         return dim_t::undefined;
   }
 }
 
 // Helper to create iter_properties from input parameters
 std::vector<einsum_ir::basic::iter_property> create_iter_properties(
-    std::vector<TensorOperation::dim_t> const & dim_types,
-    std::vector<TensorOperation::exec_t> const & exec_types,
+    std::vector<dim_t> const & dim_types,
+    std::vector<exec_t> const & exec_types,
     std::vector<int64_t> const & dim_sizes,
     std::vector<int64_t> const & strides_in0,
     std::vector<int64_t> const & strides_in1,
@@ -123,8 +120,8 @@ std::vector<einsum_ir::basic::iter_property> create_iter_properties(
 // Helper to update parameters from optimized iters
 void update_parameters_from_iters(
   std::vector<einsum_ir::basic::iter_property> const & iters,
-  std::vector<TensorOperation::dim_t> & dim_types,
-  std::vector<TensorOperation::exec_t> & exec_types,
+  std::vector<dim_t> & dim_types,
+  std::vector<exec_t> & exec_types,
   std::vector<int64_t> & dim_sizes,
   std::vector<int64_t> & strides_in0,
   std::vector<int64_t> & strides_in1,
@@ -164,17 +161,17 @@ void update_parameters_from_iters(
 }
 
 // Helper to get dtype size in bytes
-int64_t dtype_to_num_bytes(TensorOperation::dtype_t dtype) {
+int64_t dtype_to_num_bytes(dtype_t dtype) {
   switch (dtype) {
-    case TensorOperation::dtype_t::fp32: return sizeof(float);
-    case TensorOperation::dtype_t::fp64: return sizeof(double);
+    case dtype_t::fp32: return sizeof(float);
+    case dtype_t::fp64: return sizeof(double);
     default:                             return 0; // Undefined or unsupported type
   }
 }
 
 void calculate_sfc_sizes(
-  std::vector<TensorOperation::dim_t> const & dim_types,
-  std::vector<TensorOperation::exec_t> const & exec_types,
+  std::vector<dim_t> const & dim_types,
+  std::vector<exec_t> const & exec_types,
   std::vector<int64_t> const & dim_sizes,
   int64_t & o_size_sfc_m,
   int64_t & o_size_sfc_n
@@ -183,10 +180,10 @@ void calculate_sfc_sizes(
   o_size_sfc_n = 1;
 
   for(std::size_t i = 0; i < dim_types.size(); i++) {
-    if(exec_types[i] == TensorOperation::exec_t::sfc) {
-      if(dim_types[i] == TensorOperation::dim_t::m) {
+    if(exec_types[i] == exec_t::sfc) {
+      if(dim_types[i] == dim_t::m) {
         o_size_sfc_m *= dim_sizes[i];
-      } else if(dim_types[i] == TensorOperation::dim_t::n) {
+      } else if(dim_types[i] == dim_t::n) {
         o_size_sfc_n *= dim_sizes[i];
       }
     }
@@ -197,31 +194,31 @@ TppBackend::TppBackend() {
     // Default constructor - backends will be initialized in setup()
 }
 
-TensorOperation::error_t TppBackend::setup(
-    TensorOperation::dtype_t dtype,
-    TensorOperation::prim_t prim_first,
-    TensorOperation::prim_t prim_main,
-    TensorOperation::prim_t prim_last,
-    std::vector<TensorOperation::dim_t> const & dim_types,
-    std::vector<TensorOperation::exec_t> const & exec_types,
+error_t TppBackend::setup(
+    dtype_t dtype,
+    prim_t prim_first,
+    prim_t prim_main,
+    prim_t prim_last,
+    std::vector<dim_t> const & dim_types,
+    std::vector<exec_t> const & exec_types,
     std::vector<int64_t> const & dim_sizes,
     std::vector<std::vector<std::vector<int64_t>>> const & strides
 ) {
     m_op_type = determine_op_type(prim_main);
 
-    if (m_op_type == TensorOperation::op_type_t::undefined) {
-        return TensorOperation::error_t::compilation_failed;
+    if (m_op_type == op_type_t::undefined) {
+        return error_t::compilation_failed;
     }
 
     // Validate stride dimensions: must have at least level 0
     if (strides.size() == 0) {
-        return TensorOperation::error_t::invalid_stride_shape;
+        return error_t::invalid_stride_shape;
     }
 
     // Validate level 0 has correct number of tensors
-    size_t expected_tensors = (m_op_type == TensorOperation::op_type_t::binary) ? 3 : 2;
+    size_t expected_tensors = (m_op_type == op_type_t::binary) ? 3 : 2;
     if (strides[0].size() != expected_tensors) {
-        return TensorOperation::error_t::invalid_stride_shape;
+        return error_t::invalid_stride_shape;
     }
 
     // Extract level 0 strides from each tensor
@@ -229,19 +226,19 @@ TensorOperation::error_t TppBackend::setup(
 
     // Validate and extract in0 strides
     if (strides[0][0].size() != dim_sizes.size()) {
-        return TensorOperation::error_t::invalid_stride_shape;
+        return error_t::invalid_stride_shape;
     }
     strides_in0 = strides[0][0];
 
-    if (m_op_type == TensorOperation::op_type_t::binary) {
+    if (m_op_type == op_type_t::binary) {
         // Binary operation: validate and extract in1 and out strides
         if (strides[0][1].size() != dim_sizes.size()) {
-            return TensorOperation::error_t::invalid_stride_shape;
+            return error_t::invalid_stride_shape;
         }
         strides_in1 = strides[0][1];
 
         if (strides[0][2].size() != dim_sizes.size()) {
-            return TensorOperation::error_t::invalid_stride_shape;
+            return error_t::invalid_stride_shape;
         }
         strides_out = strides[0][2];
 
@@ -251,13 +248,13 @@ TensorOperation::error_t TppBackend::setup(
     else {
         // Unary operation: validate and extract out strides
         if (strides[0][1].size() != dim_sizes.size()) {
-            return TensorOperation::error_t::invalid_stride_shape;
+            return error_t::invalid_stride_shape;
         }
         strides_out = strides[0][1];
 
         // Validate: prim_first and prim_last must be 'none' for unary
-        if (prim_first != TensorOperation::prim_t::none || prim_last != TensorOperation::prim_t::none) {
-            return TensorOperation::error_t::compilation_failed;
+        if (prim_first != prim_t::none || prim_last != prim_t::none) {
+            return error_t::compilation_failed;
         }
 
         return setup_unary(dtype, prim_main, exec_types, dim_sizes, strides_in0, strides_out);
@@ -269,31 +266,31 @@ void TppBackend::execute(
     void const * tensor_in1,
     void * tensor_out
 ) {
-    if (m_op_type == TensorOperation::op_type_t::unary) {
+    if (m_op_type == op_type_t::unary) {
         m_backend_unary.eval(tensor_in0, tensor_out);
     }
-    else if (m_op_type == TensorOperation::op_type_t::binary) {
+    else if (m_op_type == op_type_t::binary) {
         m_backend_binary.contract(tensor_in0, tensor_in1, nullptr, tensor_out);
     }
 }
 
 std::tuple<
-    TensorOperation::error_t,
-    TensorOperation::dtype_t,
-    TensorOperation::prim_t,
-    TensorOperation::prim_t,
-    TensorOperation::prim_t,
-    std::vector<TensorOperation::dim_t>,
-    std::vector<TensorOperation::exec_t>,
+    error_t,
+    dtype_t,
+    prim_t,
+    prim_t,
+    prim_t,
+    std::vector<dim_t>,
+    std::vector<exec_t>,
     std::vector<int64_t>,
     std::vector<std::vector<std::vector<int64_t>>>
 > TppBackend::optimize(
-    TensorOperation::dtype_t dtype,
-    TensorOperation::prim_t prim_first,
-    TensorOperation::prim_t prim_main,
-    TensorOperation::prim_t prim_last,
-    std::vector<TensorOperation::dim_t> const & dim_types,
-    std::vector<TensorOperation::exec_t> const & exec_types,
+    dtype_t dtype,
+    prim_t prim_first,
+    prim_t prim_main,
+    prim_t prim_last,
+    std::vector<dim_t> const & dim_types,
+    std::vector<exec_t> const & exec_types,
     std::vector<int64_t> const & dim_sizes,
     std::vector<std::vector<std::vector<int64_t>>> const & strides,
     py::dict const & optimization_config
@@ -317,7 +314,7 @@ std::tuple<
             if (valid_keys.find(key) == valid_keys.end()) {
                 std::vector<std::vector<std::vector<int64_t>>> empty_strides;
                 return std::make_tuple(
-                    TensorOperation::error_t::invalid_optimization_config,
+                    error_t::invalid_optimization_config,
                     dtype, prim_first, prim_main, prim_last,
                     dim_types, exec_types, dim_sizes, empty_strides
                 );
@@ -356,7 +353,7 @@ std::tuple<
         // Type casting failed
         std::vector<std::vector<std::vector<int64_t>>> empty_strides;
         return std::make_tuple(
-            TensorOperation::error_t::invalid_optimization_config,
+            error_t::invalid_optimization_config,
             dtype, prim_first, prim_main, prim_last,
             dim_types, exec_types, dim_sizes, empty_strides
         );
@@ -389,10 +386,10 @@ py::dict TppBackend::get_default_optimization_config() {
     return result;
 }
 
-TensorOperation::error_t TppBackend::setup_unary(
-    TensorOperation::dtype_t dtype,
-    TensorOperation::prim_t prim_main,
-    std::vector<TensorOperation::exec_t> const & exec_types,
+error_t TppBackend::setup_unary(
+    dtype_t dtype,
+    prim_t prim_main,
+    std::vector<exec_t> const & exec_types,
     std::vector<int64_t> const & dim_sizes,
     std::vector<int64_t> const & strides_in0,
     std::vector<int64_t> const & strides_out
@@ -400,8 +397,8 @@ TensorOperation::error_t TppBackend::setup_unary(
     // Convert data types
     einsum_ir::basic::data_t l_dtype_in = einsum_ir::basic::data_t::UNDEFINED_DTYPE;
     switch (dtype) {
-        case TensorOperation::dtype_t::fp32: l_dtype_in = einsum_ir::basic::data_t::FP32; break;
-        case TensorOperation::dtype_t::fp64: l_dtype_in = einsum_ir::basic::data_t::FP64; break;
+        case dtype_t::fp32: l_dtype_in = einsum_ir::basic::data_t::FP32; break;
+        case dtype_t::fp64: l_dtype_in = einsum_ir::basic::data_t::FP64; break;
         default: l_dtype_in = einsum_ir::basic::data_t::UNDEFINED_DTYPE; break;
     }
     einsum_ir::basic::data_t l_dtype_comp = l_dtype_in;
@@ -428,19 +425,19 @@ TensorOperation::error_t TppBackend::setup_unary(
     // Compile backend
     einsum_ir::basic::err_t l_err = m_backend_unary.compile();
     if (l_err != einsum_ir::basic::err_t::SUCCESS) {
-        return TensorOperation::error_t::compilation_failed;
+        return error_t::compilation_failed;
     }
 
-    return TensorOperation::error_t::success;
+    return error_t::success;
 }
 
-TensorOperation::error_t TppBackend::setup_binary(
-    TensorOperation::dtype_t dtype,
-    TensorOperation::prim_t prim_first,
-    TensorOperation::prim_t prim_main,
-    TensorOperation::prim_t prim_last,
-    std::vector<TensorOperation::dim_t> const & dim_types,
-    std::vector<TensorOperation::exec_t> const & exec_types,
+error_t TppBackend::setup_binary(
+    dtype_t dtype,
+    prim_t prim_first,
+    prim_t prim_main,
+    prim_t prim_last,
+    std::vector<dim_t> const & dim_types,
+    std::vector<exec_t> const & exec_types,
     std::vector<int64_t> const & dim_sizes,
     std::vector<std::vector<std::vector<int64_t>>> const & strides
 ) {
@@ -507,8 +504,8 @@ TensorOperation::error_t TppBackend::setup_binary(
     // Convert data types
     einsum_ir::basic::data_t l_dtype_left = einsum_ir::basic::data_t::UNDEFINED_DTYPE;
     switch (dtype) {
-        case TensorOperation::dtype_t::fp32: l_dtype_left = einsum_ir::basic::data_t::FP32; break;
-        case TensorOperation::dtype_t::fp64: l_dtype_left = einsum_ir::basic::data_t::FP64; break;
+        case dtype_t::fp32: l_dtype_left = einsum_ir::basic::data_t::FP32; break;
+        case dtype_t::fp64: l_dtype_left = einsum_ir::basic::data_t::FP64; break;
         default: l_dtype_left = einsum_ir::basic::data_t::UNDEFINED_DTYPE; break;
     }
     einsum_ir::basic::data_t l_dtype_right = l_dtype_left;
@@ -548,29 +545,29 @@ TensorOperation::error_t TppBackend::setup_binary(
     // Compile backend
     einsum_ir::basic::err_t l_err = m_backend_binary.compile();
     if (l_err != einsum_ir::basic::err_t::SUCCESS) {
-        return TensorOperation::error_t::compilation_failed;
+        return error_t::compilation_failed;
     }
 
-    return TensorOperation::error_t::success;
+    return error_t::success;
 }
 
 std::tuple<
-    TensorOperation::error_t,
-    TensorOperation::dtype_t,
-    TensorOperation::prim_t,
-    TensorOperation::prim_t,
-    TensorOperation::prim_t,
-    std::vector<TensorOperation::dim_t>,
-    std::vector<TensorOperation::exec_t>,
+    error_t,
+    dtype_t,
+    prim_t,
+    prim_t,
+    prim_t,
+    std::vector<dim_t>,
+    std::vector<exec_t>,
     std::vector<int64_t>,
     std::vector<std::vector<std::vector<int64_t>>>
-> TppBackend::optimize_impl(
-    TensorOperation::dtype_t dtype,
-    TensorOperation::prim_t prim_first,
-    TensorOperation::prim_t prim_main,
-    TensorOperation::prim_t prim_last,
-    std::vector<TensorOperation::dim_t> const & dim_types,
-    std::vector<TensorOperation::exec_t> const & exec_types,
+> TppBackend::optimize(
+    dtype_t dtype,
+    prim_t prim_first,
+    prim_t prim_main,
+    prim_t prim_last,
+    std::vector<dim_t> const & dim_types,
+    std::vector<exec_t> const & exec_types,
     std::vector<int64_t> const & dim_sizes,
     std::vector<std::vector<std::vector<int64_t>>> const & strides,
     TppOptimizationConfig const & optimization_config
@@ -590,27 +587,27 @@ std::tuple<
     int64_t l_num_threads[3] = {1, 1, 1};
     l_num_threads[0] = get_num_threads(optimization_config.num_threads);
 
-    TensorOperation::op_type_t l_op_type = determine_op_type(prim_main);
+    op_type_t l_op_type = determine_op_type(prim_main);
 
     // Validate stride dimensions based on operation type
-    size_t l_expected_tensors = (l_op_type == TensorOperation::op_type_t::binary) ? 3 : 2;
+    size_t l_expected_tensors = (l_op_type == op_type_t::binary) ? 3 : 2;
 
-    if (l_op_type == TensorOperation::op_type_t::undefined) {
-        return std::make_tuple(TensorOperation::error_t::compilation_failed, dtype, prim_first,
+    if (l_op_type == op_type_t::undefined) {
+        return std::make_tuple(error_t::compilation_failed, dtype, prim_first,
                                prim_main, prim_last, dim_types, exec_types,
                                dim_sizes, l_empty_strides);
     }
 
     // Validate stride dimensions: must have at least level 0
     if (strides.size() == 0) {
-        return std::make_tuple(TensorOperation::error_t::invalid_stride_shape, dtype, prim_first,
+        return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
                                prim_main, prim_last, dim_types, exec_types,
                                dim_sizes, l_empty_strides);
     }
 
     // Validate level 0 has correct number of tensors
     if (strides[0].size() != l_expected_tensors) {
-        return std::make_tuple(TensorOperation::error_t::invalid_stride_shape, dtype, prim_first,
+        return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
                                prim_main, prim_last, dim_types, exec_types,
                                dim_sizes, l_empty_strides);
     }
@@ -618,7 +615,7 @@ std::tuple<
     // Validate that level 0 has proper dimensions for each tensor
     for (size_t t = 0; t < l_expected_tensors; ++t) {
         if (strides[0][t].size() != dim_sizes.size()) {
-            return std::make_tuple(TensorOperation::error_t::invalid_stride_shape, dtype, prim_first,
+            return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
                                    prim_main, prim_last, dim_types, exec_types,
                                    dim_sizes, l_empty_strides);
         }
@@ -626,24 +623,24 @@ std::tuple<
 
     // Extract level 0 strides
     std::vector<int64_t> l_strides_in0 = strides[0][0];
-    std::vector<int64_t> l_strides_in1 = (l_op_type == TensorOperation::op_type_t::binary) ? strides[0][1]
+    std::vector<int64_t> l_strides_in1 = (l_op_type == op_type_t::binary) ? strides[0][1]
                                                                                         : std::vector<int64_t>(dim_sizes.size(), 0);
-    std::vector<int64_t> l_strides_out = (l_op_type == TensorOperation::op_type_t::binary) ? strides[0][2] : strides[0][1];
+    std::vector<int64_t> l_strides_out = (l_op_type == op_type_t::binary) ? strides[0][2] : strides[0][1];
 
     // Make copies of input parameters for optimization
-    std::vector<TensorOperation::dim_t> l_opt_dim_types = dim_types;
-    std::vector<TensorOperation::exec_t> l_opt_exec_types = exec_types;
+    std::vector<dim_t> l_opt_dim_types = dim_types;
+    std::vector<exec_t> l_opt_exec_types = exec_types;
     std::vector<int64_t> l_opt_dim_sizes = dim_sizes;
     std::vector<int64_t> l_opt_strides_in0 = l_strides_in0;
     std::vector<int64_t> l_opt_strides_in1 = l_strides_in1;
     std::vector<int64_t> l_opt_strides_out = l_strides_out;
     std::vector<int64_t> l_opt_packing_in0;
     std::vector<int64_t> l_opt_packing_in1;
-    TensorOperation::prim_t l_opt_prim_main = prim_main;
+    prim_t l_opt_prim_main = prim_main;
 
-    TensorOperation::error_t l_err = TensorOperation::error_t::success;
+    error_t l_err = error_t::success;
 
-    if (l_op_type == TensorOperation::op_type_t::unary) {
+    if (l_op_type == op_type_t::unary) {
         // Unary optimization
         l_err = optimize_unary(dtype, l_opt_prim_main, l_opt_dim_types, l_opt_exec_types,
                                l_opt_dim_sizes, l_opt_strides_in0, l_opt_strides_out,
@@ -658,7 +655,7 @@ std::tuple<
                                 l_sfc_support, l_l2_cache_size);
     }
 
-    if (l_err != TensorOperation::error_t::success) {
+    if (l_err != error_t::success) {
         return std::make_tuple(l_err, dtype, prim_first, l_opt_prim_main, prim_last,
                                l_opt_dim_types, l_opt_exec_types, l_opt_dim_sizes, l_empty_strides);
     }
@@ -666,7 +663,7 @@ std::tuple<
     // Build output 3D strides with [LEVEL][TENSOR][DIMENSION] order
     std::vector<std::vector<std::vector<int64_t>>> opt_strides;
 
-    if (l_op_type == TensorOperation::op_type_t::binary) {
+    if (l_op_type == op_type_t::binary) {
         // Check if packing strides are all zero
         bool l_has_packing = false;
         for (size_t i = 0; i < l_opt_packing_in0.size() && !l_has_packing; ++i) {
@@ -698,11 +695,11 @@ std::tuple<
                            l_opt_dim_types, l_opt_exec_types, l_opt_dim_sizes, opt_strides);
 }
 
-TensorOperation::error_t TppBackend::optimize_unary(
-    TensorOperation::dtype_t dtype,
-    TensorOperation::prim_t & prim_main,
-    std::vector<TensorOperation::dim_t> & dim_types,
-    std::vector<TensorOperation::exec_t> & exec_types,
+error_t TppBackend::optimize_unary(
+    dtype_t dtype,
+    prim_t & prim_main,
+    std::vector<dim_t> & dim_types,
+    std::vector<exec_t> & exec_types,
     std::vector<int64_t> & dim_sizes,
     std::vector<int64_t> & strides_in0,
     std::vector<int64_t> & strides_out,
@@ -733,7 +730,7 @@ TensorOperation::error_t TppBackend::optimize_unary(
     // Run optimization
     einsum_ir::basic::err_t l_err = l_optimizer.optimize();
     if (l_err != einsum_ir::basic::err_t::SUCCESS) {
-        return TensorOperation::error_t::compilation_failed;
+        return error_t::compilation_failed;
     }
 
     // Update parameters from optimized iters
@@ -757,14 +754,14 @@ TensorOperation::error_t TppBackend::optimize_unary(
         strides_out.push_back(l_iter.stride_out);
     }
 
-    return TensorOperation::error_t::success;
+    return error_t::success;
 }
 
-TensorOperation::error_t TppBackend::optimize_binary(
-    TensorOperation::dtype_t dtype,
-    TensorOperation::prim_t & prim_main,
-    std::vector<TensorOperation::dim_t> & dim_types,
-    std::vector<TensorOperation::exec_t> & exec_types,
+error_t TppBackend::optimize_binary(
+    dtype_t dtype,
+    prim_t & prim_main,
+    std::vector<dim_t> & dim_types,
+    std::vector<exec_t> & exec_types,
     std::vector<int64_t> & dim_sizes,
     std::vector<int64_t> & strides_in0,
     std::vector<int64_t> & strides_in1,
@@ -833,12 +830,12 @@ TensorOperation::error_t TppBackend::optimize_binary(
     
     // Update primitive type if changed
     if (l_kernel_main == einsum_ir::basic::kernel_t::BR_MADD) {
-        prim_main = TensorOperation::prim_t::brgemm;
+        prim_main = prim_t::brgemm;
     } else if (l_kernel_main == einsum_ir::basic::kernel_t::MADD) {
-        prim_main = TensorOperation::prim_t::gemm;
+        prim_main = prim_t::gemm;
     }
     
-    return TensorOperation::error_t::success;
+    return error_t::success;
 }
 
 } // namespace py

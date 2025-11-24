@@ -5,42 +5,42 @@
 #include "TensorOperation.h"
 
 namespace py  = pybind11;
-using einsum_ir::py::TensorOperation;
+using namespace einsum_ir::py;
 
 PYBIND11_MODULE(_etops_core, m) {
-  py::enum_<TensorOperation::error_t>(m, "ErrorType")
-    .value("success", TensorOperation::error_t::success)
-    .value("compilation_failed", TensorOperation::error_t::compilation_failed)
-    .value("invalid_stride_shape", TensorOperation::error_t::invalid_stride_shape)
-    .value("invalid_optimization_config", TensorOperation::error_t::invalid_optimization_config)
+  py::enum_<einsum_ir::py::error_t>(m, "ErrorType")
+    .value("success", einsum_ir::py::error_t::success)
+    .value("compilation_failed", einsum_ir::py::error_t::compilation_failed)
+    .value("invalid_stride_shape", einsum_ir::py::error_t::invalid_stride_shape)
+    .value("invalid_optimization_config", einsum_ir::py::error_t::invalid_optimization_config)
     .export_values();
 
-  py::enum_<TensorOperation::dtype_t>(m, "DataType" )
-    .value("float32",  TensorOperation::dtype_t::fp32)
-    .value("float64",  TensorOperation::dtype_t::fp64)
+  py::enum_<einsum_ir::py::dtype_t>(m, "DataType" )
+    .value("float32",  einsum_ir::py::dtype_t::fp32)
+    .value("float64",  einsum_ir::py::dtype_t::fp64)
     .export_values();
 
-  py::enum_<TensorOperation::prim_t>(m, "PrimType")
-    .value("none",   TensorOperation::prim_t::none)
-    .value("zero",   TensorOperation::prim_t::zero)
-    .value("relu",   TensorOperation::prim_t::relu)
-    .value("copy",   TensorOperation::prim_t::copy)
-    .value("gemm",   TensorOperation::prim_t::gemm)
-    .value("brgemm", TensorOperation::prim_t::brgemm)
+  py::enum_<einsum_ir::py::prim_t>(m, "PrimType")
+    .value("none",   einsum_ir::py::prim_t::none)
+    .value("zero",   einsum_ir::py::prim_t::zero)
+    .value("relu",   einsum_ir::py::prim_t::relu)
+    .value("copy",   einsum_ir::py::prim_t::copy)
+    .value("gemm",   einsum_ir::py::prim_t::gemm)
+    .value("brgemm", einsum_ir::py::prim_t::brgemm)
     .export_values();
 
-  py::enum_<TensorOperation::exec_t>(m, "ExecType")
-    .value("prim",   TensorOperation::exec_t::prim)
-    .value("seq",    TensorOperation::exec_t::seq)
-    .value("shared", TensorOperation::exec_t::shared)
-    .value("sfc",    TensorOperation::exec_t::sfc)
+  py::enum_<einsum_ir::py::exec_t>(m, "ExecType")
+    .value("prim",   einsum_ir::py::exec_t::prim)
+    .value("seq",    einsum_ir::py::exec_t::seq)
+    .value("shared", einsum_ir::py::exec_t::shared)
+    .value("sfc",    einsum_ir::py::exec_t::sfc)
     .export_values();
 
-  py::enum_<TensorOperation::dim_t>(m, "DimType")
-    .value("c", TensorOperation::dim_t::c)
-    .value("m", TensorOperation::dim_t::m)
-    .value("n", TensorOperation::dim_t::n)
-    .value("k", TensorOperation::dim_t::k)
+  py::enum_<einsum_ir::py::dim_t>(m, "DimType")
+    .value("c", einsum_ir::py::dim_t::c)
+    .value("m", einsum_ir::py::dim_t::m)
+    .value("n", einsum_ir::py::dim_t::n)
+    .value("k", einsum_ir::py::dim_t::k)
     .export_values();
 
   py::class_<TensorOperation>(m, "TensorOperation")
@@ -50,15 +50,15 @@ PYBIND11_MODULE(_etops_core, m) {
       [](
         TensorOperation                                      & self,
         std::string                                    const & backend,
-        TensorOperation::dtype_t                               dtype,
-        TensorOperation::prim_t                                prim_first,
-        TensorOperation::prim_t                                prim_main,
-        TensorOperation::prim_t                                prim_last,
-        std::vector<TensorOperation::dim_t>            const & dim_types,
-        std::vector<TensorOperation::exec_t>           const & exec_types,
+        einsum_ir::py::dtype_t                               dtype,
+        einsum_ir::py::prim_t                                prim_first,
+        einsum_ir::py::prim_t                                prim_main,
+        einsum_ir::py::prim_t                                prim_last,
+        std::vector<einsum_ir::py::dim_t>            const & dim_types,
+        std::vector<einsum_ir::py::exec_t>           const & exec_types,
         std::vector<int64_t>                           const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides
-      ) -> TensorOperation::error_t {
+      ) -> einsum_ir::py::error_t {
         // Call new TensorOperation setup with backend parameter
         return self.setup(backend, dtype, prim_first, prim_main, prim_last,
                          dim_types, exec_types, dim_sizes, strides);
@@ -142,17 +142,83 @@ PYBIND11_MODULE(_etops_core, m) {
       "optimize",
       [](
         std::string                                    const & backend,
-        TensorOperation::dtype_t                               dtype,
-        TensorOperation::prim_t                                prim_first,
-        TensorOperation::prim_t                                prim_main,
-        TensorOperation::prim_t                                prim_last,
-        std::vector<TensorOperation::dim_t>            const & dim_types,
-        std::vector<TensorOperation::exec_t>           const & exec_types,
+        einsum_ir::py::dtype_t                               dtype,
+        einsum_ir::py::prim_t                                prim_first,
+        einsum_ir::py::prim_t                                prim_main,
+        einsum_ir::py::prim_t                                prim_last,
+        std::vector<einsum_ir::py::dim_t>            const & dim_types,
+        std::vector<einsum_ir::py::exec_t>           const & exec_types,
         std::vector<int64_t>                           const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides,
         py::dict                                       const & optimization_config_dict
       ) -> py::tuple {
-        // Call the new static optimize function with backend and dict
+              // Parse the Python dict and create OptimizationConfig struct
+        einsum_ir::py::OptimizationConfig l_optimization_config;
+
+        // Get defaults first
+        l_optimization_config = TensorOperation::get_default_optimization_config(backend);
+
+        // Valid keys for TPP backend
+        std::set<std::string> valid_keys = {
+          "target_m", "target_n", "target_k", "num_threads",
+          "br_gemm_support", "packed_gemm_support", "packing_support",
+          "sfc_support", "l2_cache_size"
+        };
+
+        try {
+          // Check for unknown keys
+          for (auto item : optimization_config_dict) {
+            std::string key = item.first.cast<std::string>();
+            if (valid_keys.find(key) == valid_keys.end()) {
+              // Return error for unknown key
+              std::vector<std::vector<std::vector<int64_t>>> empty_strides;
+              return py::make_tuple(
+                einsum_ir::py::error_t::invalid_optimization_config,
+                dtype, prim_first, prim_main, prim_last,
+                dim_types, exec_types, dim_sizes, empty_strides
+              );
+            }
+          }
+
+          // Override defaults with provided values
+          if (optimization_config_dict.contains("target_m")) {
+            l_optimization_config.target_m = optimization_config_dict["target_m"].cast<int64_t>();
+          }
+          if (optimization_config_dict.contains("target_n")) {
+            l_optimization_config.target_n = optimization_config_dict["target_n"].cast<int64_t>();
+          }
+          if (optimization_config_dict.contains("target_k")) {
+            l_optimization_config.target_k = optimization_config_dict["target_k"].cast<int64_t>();
+          }
+          if (optimization_config_dict.contains("num_threads")) {
+            l_optimization_config.num_threads = optimization_config_dict["num_threads"].cast<int64_t>();
+          }
+          if (optimization_config_dict.contains("packed_gemm_support")) {
+            l_optimization_config.packed_gemm_support = optimization_config_dict["packed_gemm_support"].cast<bool>();
+          }
+          if (optimization_config_dict.contains("br_gemm_support")) {
+            l_optimization_config.br_gemm_support = optimization_config_dict["br_gemm_support"].cast<bool>();
+          }
+          if (optimization_config_dict.contains("packing_support")) {
+            l_optimization_config.packing_support = optimization_config_dict["packing_support"].cast<bool>();
+          }
+          if (optimization_config_dict.contains("sfc_support")) {
+            l_optimization_config.sfc_support = optimization_config_dict["sfc_support"].cast<bool>();
+          }
+          if (optimization_config_dict.contains("l2_cache_size")) {
+            l_optimization_config.l2_cache_size = optimization_config_dict["l2_cache_size"].cast<int64_t>();
+          }
+        } catch (...) {
+          // Type casting failed
+          std::vector<std::vector<std::vector<int64_t>>> empty_strides;
+          return py::make_tuple(
+            einsum_ir::py::error_t::invalid_optimization_config,
+            dtype, prim_first, prim_main, prim_last,
+            dim_types, exec_types, dim_sizes, empty_strides
+          );
+        }
+
+        // Call the static optimize function with the struct
         auto result = TensorOperation::optimize(
           backend,
           dtype,
@@ -163,7 +229,7 @@ PYBIND11_MODULE(_etops_core, m) {
           exec_types,
           dim_sizes,
           strides,
-          optimization_config_dict
+          l_optimization_config
         );
 
         // Return tuple of (error, optimized_parameters)
@@ -221,8 +287,22 @@ PYBIND11_MODULE(_etops_core, m) {
     .def_static(
       "get_default_optimization_config",
       [](std::string const & backend) -> py::dict {
-        // Call the new static get_default_optimization_config with backend
-        return TensorOperation::get_default_optimization_config(backend);
+         // Get the struct from C++ (TPP backend)
+        auto l_config = TensorOperation::get_default_optimization_config(backend);
+
+        // Convert to Python dict
+        py::dict result;
+        result["target_m"]            = l_config.target_m;
+        result["target_n"]            = l_config.target_n;
+        result["target_k"]            = l_config.target_k;
+        result["num_threads"]         = l_config.num_threads;
+        result["packed_gemm_support"] = l_config.packed_gemm_support;
+        result["br_gemm_support"]     = l_config.br_gemm_support;
+        result["packing_support"]     = l_config.packing_support;
+        result["sfc_support"]         = l_config.sfc_support;
+        result["l2_cache_size"]       = l_config.l2_cache_size;
+
+        return result;
       },
       R"doc(
         Get default optimization configuration for a backend.

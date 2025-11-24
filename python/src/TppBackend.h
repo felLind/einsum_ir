@@ -2,10 +2,7 @@
 #define TPP_BACKEND_H
 
 #include "BackendInterface.h"
-#include "TensorOperation.h"
 #include <memory>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 #include <einsum_ir/basic/unary/UnaryBackendTpp.h>
 #include <einsum_ir/basic/unary/UnaryOptimizer.h>
 #include <einsum_ir/basic/binary/ContractionBackendTpp.h>
@@ -44,13 +41,13 @@ public:
     TppBackend();
     virtual ~TppBackend() = default;
 
-    virtual TensorOperation::error_t setup(
-        TensorOperation::dtype_t dtype,
-        TensorOperation::prim_t prim_first,
-        TensorOperation::prim_t prim_main,
-        TensorOperation::prim_t prim_last,
-        std::vector<TensorOperation::dim_t> const & dim_types,
-        std::vector<TensorOperation::exec_t> const & exec_types,
+    virtual error_t setup(
+        dtype_t dtype,
+        prim_t prim_first,
+        prim_t prim_main,
+        prim_t prim_last,
+        std::vectordim_t> const & dim_types,
+        std::vectorexec_t> const & exec_types,
         std::vector<int64_t> const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides
     ) override;
@@ -62,37 +59,37 @@ public:
     ) override;
 
     virtual std::tuple<
-        TensorOperation::error_t,
-        TensorOperation::dtype_t,
-        TensorOperation::prim_t,
-        TensorOperation::prim_t,
-        TensorOperation::prim_t,
-        std::vector<TensorOperation::dim_t>,
-        std::vector<TensorOperation::exec_t>,
+        error_t,
+        dtype_t,
+        prim_t,
+        prim_t,
+        prim_t,
+        std::vector<dim_t>,
+        std::vector<exec_t>,
         std::vector<int64_t>,
         std::vector<std::vector<std::vector<int64_t>>>
     > optimize(
-        TensorOperation::dtype_t dtype,
-        TensorOperation::prim_t prim_first,
-        TensorOperation::prim_t prim_main,
-        TensorOperation::prim_t prim_last,
-        std::vector<TensorOperation::dim_t> const & dim_types,
-        std::vector<TensorOperation::exec_t> const & exec_types,
+        dtype_t dtype,
+        prim_t prim_first,
+        prim_t prim_main,
+        prim_t prim_last,
+        std::vector<dim_t> const & dim_types,
+        std::vector<exec_t> const & exec_types,
         std::vector<int64_t> const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides,
-        py::dict const & optimization_config
+        OptimizationConfig const & optimization_config
     ) override;
 
-    virtual py::dict get_default_optimization_config() override;
+    virtual OptimizationConfig get_default_optimization_config() override;
 
 private:
     /**
      * Setup for unary operations.
      */
-    TensorOperation::error_t setup_unary(
-        TensorOperation::dtype_t dtype,
-        TensorOperation::prim_t prim_main,
-        std::vector<TensorOperation::exec_t> const & exec_types,
+    error_t setup_unary(
+        dtype_t dtype,
+        prim_t prim_main,
+        std::vector<exec_t> const & exec_types,
         std::vector<int64_t> const & dim_sizes,
         std::vector<int64_t> const & strides_in0,
         std::vector<int64_t> const & strides_out
@@ -101,13 +98,13 @@ private:
     /**
      * Setup for binary operations.
      */
-    TensorOperation::error_t setup_binary(
-        TensorOperation::dtype_t dtype,
-        TensorOperation::prim_t prim_first,
-        TensorOperation::prim_t prim_main,
-        TensorOperation::prim_t prim_last,
-        std::vector<TensorOperation::dim_t> const & dim_types,
-        std::vector<TensorOperation::exec_t> const & exec_types,
+   error_t setup_binary(
+        dtype_t dtype,
+        prim_t prim_first,
+        prim_t prim_main,
+        prim_t prim_last,
+        std::vector<dim_t> const & dim_types,
+        std::vector<exec_t> const & exec_types,
         std::vector<int64_t> const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides
     );
@@ -116,22 +113,22 @@ private:
      * Implementation of optimize functionality.
      */
     std::tuple<
-        TensorOperation::error_t,
-        TensorOperation::dtype_t,
-        TensorOperation::prim_t,
-        TensorOperation::prim_t,
-        TensorOperation::prim_t,
-        std::vector<TensorOperation::dim_t>,
-        std::vector<TensorOperation::exec_t>,
+        error_t,
+        dtype_t,
+        prim_t,
+        prim_t,
+        prim_t,
+        std::vector<im_t>,
+        std::vector<xec_t>,
         std::vector<int64_t>,
         std::vector<std::vector<std::vector<int64_t>>>
-    > optimize_impl(
-        TensorOperation::dtype_t dtype,
-        TensorOperation::prim_t prim_first,
-        TensorOperation::prim_t prim_main,
-        TensorOperation::prim_t prim_last,
-        std::vector<TensorOperation::dim_t> const & dim_types,
-        std::vector<TensorOperation::exec_t> const & exec_types,
+    > optimize(
+        dtype_t dtype,
+        prim_t prim_first,
+        prim_t prim_main,
+        prim_t prim_last,
+        std::vector<dim_t> const & dim_types,
+        std::vector<exec_t> const & exec_types,
         std::vector<int64_t> const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides,
         TppOptimizationConfig const & optimization_config
@@ -140,11 +137,11 @@ private:
     /**
      * Optimize unary operations.
      */
-    TensorOperation::error_t optimize_unary(
-        TensorOperation::dtype_t dtype,
-        TensorOperation::prim_t & prim_main,
-        std::vector<TensorOperation::dim_t> & dim_types,
-        std::vector<TensorOperation::exec_t> & exec_types,
+    error_t optimize_unary(
+        dtype_t dtype,
+        prim_t & prim_main,
+        std::vector<dim_t> & dim_types,
+        std::vector<exec_t> & exec_types,
         std::vector<int64_t> & dim_sizes,
         std::vector<int64_t> & strides_in0,
         std::vector<int64_t> & strides_out,
@@ -154,11 +151,11 @@ private:
     /**
      * Optimize binary operations.
      */
-    TensorOperation::error_t optimize_binary(
-        TensorOperation::dtype_t dtype,
-        TensorOperation::prim_t & prim_main,
-        std::vector<TensorOperation::dim_t> & dim_types,
-        std::vector<TensorOperation::exec_t> & exec_types,
+    error_t optimize_binary(
+        dtype_t dtype,
+        prim_t & prim_main,
+        std::vector<dim_t> & dim_types,
+        std::vector<exec_t> & exec_types,
         std::vector<int64_t> & dim_sizes,
         std::vector<int64_t> & strides_in0,
         std::vector<int64_t> & strides_in1,

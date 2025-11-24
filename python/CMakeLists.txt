@@ -38,13 +38,29 @@ file(
 )
 
 # ------------------------------------------------------------
+# tpp_mlir
+# ------------------------------------------------------------
+message(STATUS "Including tpp_mlir from ${MLIR_TPP_DIR}")
+
+include_directories(${MLIR_TPP_DIR}"/../api")
+
+find_library(
+    Einsum-API
+    NAMES Einsum-API
+    PATHS ${MLIR_TPP_DIR}/lib
+    REQUIRED
+)
+
+add_library(Einsum-API INTERFACE)
+
+# ------------------------------------------------------------
 # Sources & target
 # ------------------------------------------------------------
 set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 CONFIG REQUIRED)
 
 add_library(TensorOperation STATIC src/TensorOperation.cpp)
-target_link_libraries(TensorOperation PUBLIC einsum_ir)
+target_link_libraries(TensorOperation PUBLIC einsum_ir Einsum-API)
 target_include_directories(
     TensorOperation
     PUBLIC

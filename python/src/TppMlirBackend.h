@@ -4,10 +4,6 @@
 #include "BackendInterface.h"
 #include "binary.h"
 #include <memory>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-
-namespace py = pybind11;
 
 namespace einsum_ir {
 namespace py {
@@ -65,10 +61,10 @@ public:
         std::vector<TensorOperation::exec_t> const & exec_types,
         std::vector<int64_t> const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides,
-        py::dict const & optimization_config
+        OptimizationConfig const & optimization_config
     ) override;
 
-    virtual py::dict get_default_optimization_config() override;
+    virtual OptimizationConfig get_default_optimization_config() override;
 };
 
 } // namespace py
