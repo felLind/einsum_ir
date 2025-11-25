@@ -1,7 +1,4 @@
 #include "TppMlirBackend.h"
-#include <pybind11/stl.h>
-
-namespace py = pybind11;
 
 namespace einsum_ir {
 namespace py {
@@ -130,7 +127,7 @@ std::tuple<
     );
 }
 
-py::dict TppMlirBackend::get_default_optimization_config() {
+OptimizationConfig TppMlirBackend::get_default_optimization_config() {
     // TPP-MLIR backend doesn't have optimization parameters
     return OptimizationConfig();
 }

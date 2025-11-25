@@ -8,8 +8,6 @@
 #include <einsum_ir/basic/binary/ContractionBackendTpp.h>
 #include <einsum_ir/basic/binary/ContractionOptimizer.h>
 
-namespace py = pybind11;
-
 namespace einsum_ir {
 namespace py {
 
@@ -33,7 +31,7 @@ struct TppOptimizationConfig {
  */
 class TppBackend : public BackendInterface {
 private:
-    TensorOperation::op_type_t m_op_type = TensorOperation::op_type_t::undefined;
+    op_type_t m_op_type = op_type_t::undefined;
     einsum_ir::basic::UnaryBackendTpp m_backend_unary;
     einsum_ir::basic::ContractionBackendTpp m_backend_binary;
 
@@ -46,8 +44,8 @@ public:
         prim_t prim_first,
         prim_t prim_main,
         prim_t prim_last,
-        std::vectordim_t> const & dim_types,
-        std::vectorexec_t> const & exec_types,
+        std::vector<dim_t> const & dim_types,
+        std::vector<exec_t> const & exec_types,
         std::vector<int64_t> const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides
     ) override;
@@ -118,8 +116,8 @@ private:
         prim_t,
         prim_t,
         prim_t,
-        std::vector<im_t>,
-        std::vector<xec_t>,
+        std::vector<dim_t>,
+        std::vector<exec_t>,
         std::vector<int64_t>,
         std::vector<std::vector<std::vector<int64_t>>>
     > optimize(

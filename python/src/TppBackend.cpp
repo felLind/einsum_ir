@@ -1,5 +1,6 @@
 #include "TppBackend.h"
 #include <set>
+#include <memory>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -274,6 +275,7 @@ void TppBackend::execute(
     }
 }
 
+
 std::tuple<
     error_t,
     dtype_t,
@@ -293,97 +295,145 @@ std::tuple<
     std::vector<exec_t> const & exec_types,
     std::vector<int64_t> const & dim_sizes,
     std::vector<std::vector<std::vector<int64_t>>> const & strides,
-    py::dict const & optimization_config
+    OptimizationConfig const & optimization_config
 ) {
-    // Parse the Python dict and create TppOptimizationConfig struct
-    TppOptimizationConfig l_optimization_config;
+    std::vector<std::vector<std::vector<int64_t>>> l_empty_strides;
 
-    // Defaults are set in struct declaration
+    // Extract optimization parameters from config
+    int64_t l_target_m            = optimization_config.target_m;
+    int64_t l_target_n            = optimization_config.target_n;
+    int64_t l_target_k            = optimization_config.target_k;
+    bool    l_packed_gemm_support = optimization_config.packed_gemm_support;
+    bool    l_br_gemm_support     = optimization_config.br_gemm_support;
+    bool    l_packing_support     = optimization_config.packing_support;
+    bool    l_sfc_support         = optimization_config.sfc_support;
+    int64_t l_l2_cache_size       = optimization_config.l2_cache_size;
 
-    // Valid keys for TPP backend
-    std::set<std::string> valid_keys = {
-        "target_m", "target_n", "target_k", "num_threads",
-        "br_gemm_support", "packed_gemm_support", "packing_support",
-        "sfc_support", "l2_cache_size"
-    };
+    int64_t l_num_threads[3] = {1, 1, 1};
+    l_num_threads[0] = get_num_threads(optimization_config.num_threads);
 
-    try {
-        // Check for unknown keys
-        for (auto item : optimization_config) {
-            std::string key = item.first.cast<std::string>();
-            if (valid_keys.find(key) == valid_keys.end()) {
-                std::vector<std::vector<std::vector<int64_t>>> empty_strides;
-                return std::make_tuple(
-                    error_t::invalid_optimization_config,
-                    dtype, prim_first, prim_main, prim_last,
-                    dim_types, exec_types, dim_sizes, empty_strides
-                );
+    op_type_t l_op_type = determine_op_type(prim_main);
+
+    // Validate stride dimensions based on operation type
+    size_t l_expected_tensors = (l_op_type == op_type_t::binary) ? 3 : 2;
+
+    if (l_op_type == op_type_t::undefined) {
+        return std::make_tuple(error_t::compilation_failed, dtype, prim_first,
+                               prim_main, prim_last, dim_types, exec_types,
+                               dim_sizes, l_empty_strides);
+    }
+
+    // Validate stride dimensions: must have at least level 0
+    if (strides.size() == 0) {
+        return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
+                               prim_main, prim_last, dim_types, exec_types,
+                               dim_sizes, l_empty_strides);
+    }
+
+    // Validate level 0 has correct number of tensors
+    if (strides[0].size() != l_expected_tensors) {
+        return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
+                               prim_main, prim_last, dim_types, exec_types,
+                               dim_sizes, l_empty_strides);
+    }
+
+    // Validate that level 0 has proper dimensions for each tensor
+    for (size_t t = 0; t < l_expected_tensors; ++t) {
+        if (strides[0][t].size() != dim_sizes.size()) {
+            return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
+                                   prim_main, prim_last, dim_types, exec_types,
+                                   dim_sizes, l_empty_strides);
+        }
+    }
+
+    // Extract level 0 strides
+    std::vector<int64_t> l_strides_in0 = strides[0][0];
+    std::vector<int64_t> l_strides_in1 = (l_op_type == op_type_t::binary) ? strides[0][1]
+                                                                                        : std::vector<int64_t>(dim_sizes.size(), 0);
+    std::vector<int64_t> l_strides_out = (l_op_type == op_type_t::binary) ? strides[0][2] : strides[0][1];
+
+    // Make copies of input parameters for optimization
+    std::vector<dim_t> l_opt_dim_types = dim_types;
+    std::vector<exec_t> l_opt_exec_types = exec_types;
+    std::vector<int64_t> l_opt_dim_sizes = dim_sizes;
+    std::vector<int64_t> l_opt_strides_in0 = l_strides_in0;
+    std::vector<int64_t> l_opt_strides_in1 = l_strides_in1;
+    std::vector<int64_t> l_opt_strides_out = l_strides_out;
+    std::vector<int64_t> l_opt_packing_in0;
+    std::vector<int64_t> l_opt_packing_in1;
+    prim_t l_opt_prim_main = prim_main;
+
+    error_t l_err = error_t::success;
+
+    if (l_op_type == op_type_t::unary) {
+        // Unary optimization
+        l_err = optimize_unary(dtype, l_opt_prim_main, l_opt_dim_types, l_opt_exec_types,
+                               l_opt_dim_sizes, l_opt_strides_in0, l_opt_strides_out,
+                               l_num_threads[0]);
+    } else {
+        // Binary optimization
+        l_err = optimize_binary(dtype, l_opt_prim_main, l_opt_dim_types, l_opt_exec_types,
+                                l_opt_dim_sizes, l_opt_strides_in0, l_opt_strides_in1,
+                                l_opt_strides_out, l_opt_packing_in0, l_opt_packing_in1,
+                                l_target_m, l_target_n, l_target_k, l_num_threads,
+                                l_packed_gemm_support, l_br_gemm_support, l_packing_support,
+                                l_sfc_support, l_l2_cache_size);
+    }
+
+    if (l_err != error_t::success) {
+        return std::make_tuple(l_err, dtype, prim_first, l_opt_prim_main, prim_last,
+                               l_opt_dim_types, l_opt_exec_types, l_opt_dim_sizes, l_empty_strides);
+    }
+
+    // Build output 3D strides with [LEVEL][TENSOR][DIMENSION] order
+    std::vector<std::vector<std::vector<int64_t>>> opt_strides;
+
+    if (l_op_type == op_type_t::binary) {
+        // Check if packing strides are all zero
+        bool l_has_packing = false;
+        for (size_t i = 0; i < l_opt_packing_in0.size() && !l_has_packing; ++i) {
+            if (l_opt_packing_in0[i] != 0 || l_opt_packing_in1[i] != 0) {
+                l_has_packing = true;
             }
         }
 
-        // Override defaults with provided values
-        if (optimization_config.contains("target_m")) {
-            l_optimization_config.target_m = optimization_config["target_m"].cast<int64_t>();
+        if (l_has_packing) {
+            // Return with 2 levels: level 0 (primary) and level 1 (packing)
+            opt_strides = {
+                {l_opt_strides_in0, l_opt_strides_in1, l_opt_strides_out},  // level 0
+                {l_opt_packing_in0, l_opt_packing_in1, std::vector<int64_t>(l_opt_strides_out.size(), 0)}  // level 1 (out has no packing)
+            };
+        } else {
+            // Return with single level only
+            opt_strides = {
+                {l_opt_strides_in0, l_opt_strides_in1, l_opt_strides_out}  // level 0
+            };
         }
-        if (optimization_config.contains("target_n")) {
-            l_optimization_config.target_n = optimization_config["target_n"].cast<int64_t>();
-        }
-        if (optimization_config.contains("target_k")) {
-            l_optimization_config.target_k = optimization_config["target_k"].cast<int64_t>();
-        }
-        if (optimization_config.contains("num_threads")) {
-            l_optimization_config.num_threads = optimization_config["num_threads"].cast<int64_t>();
-        }
-        if (optimization_config.contains("packed_gemm_support")) {
-            l_optimization_config.packed_gemm_support = optimization_config["packed_gemm_support"].cast<bool>();
-        }
-        if (optimization_config.contains("br_gemm_support")) {
-            l_optimization_config.br_gemm_support = optimization_config["br_gemm_support"].cast<bool>();
-        }
-        if (optimization_config.contains("packing_support")) {
-            l_optimization_config.packing_support = optimization_config["packing_support"].cast<bool>();
-        }
-        if (optimization_config.contains("sfc_support")) {
-            l_optimization_config.sfc_support = optimization_config["sfc_support"].cast<bool>();
-        }
-        if (optimization_config.contains("l2_cache_size")) {
-            l_optimization_config.l2_cache_size = optimization_config["l2_cache_size"].cast<int64_t>();
-        }
-    } catch (...) {
-        // Type casting failed
-        std::vector<std::vector<std::vector<int64_t>>> empty_strides;
-        return std::make_tuple(
-            error_t::invalid_optimization_config,
-            dtype, prim_first, prim_main, prim_last,
-            dim_types, exec_types, dim_sizes, empty_strides
-        );
+    } else {
+        // Unary: single level only
+        opt_strides = {
+            {l_opt_strides_in0, l_opt_strides_out}  // level 0
+        };
     }
 
-    // Call our own optimize implementation
-    return optimize_impl(
-        dtype, prim_first, prim_main, prim_last,
-        dim_types, exec_types, dim_sizes, strides,
-        l_optimization_config
-    );
+    return std::make_tuple(l_err, dtype, prim_first, l_opt_prim_main, prim_last,
+                           l_opt_dim_types, l_opt_exec_types, l_opt_dim_sizes, opt_strides);
 }
 
-py::dict TppBackend::get_default_optimization_config() {
-    // Get the struct with defaults
-    TppOptimizationConfig l_config;
+OptimizationConfig TppBackend::get_default_optimization_config() {
+  OptimizationConfig config;
 
-    // Convert to Python dict
-    py::dict result;
-    result["target_m"]            = l_config.target_m;
-    result["target_n"]            = l_config.target_n;
-    result["target_k"]            = l_config.target_k;
-    result["num_threads"]         = l_config.num_threads;
-    result["packed_gemm_support"] = l_config.packed_gemm_support;
-    result["br_gemm_support"]     = l_config.br_gemm_support;
-    result["packing_support"]     = l_config.packing_support;
-    result["sfc_support"]         = l_config.sfc_support;
-    result["l2_cache_size"]       = l_config.l2_cache_size;
+  config.target_m            = 16;
+  config.target_n            = 12;
+  config.target_k            = 64;
+  config.num_threads         = 0;        // Auto-detect
+  config.packed_gemm_support = true;
+  config.br_gemm_support     = true;
+  config.packing_support     = true;
+  config.sfc_support         = true;
+  config.l2_cache_size       = 1048576;  // 1 MiB
 
-    return result;
+  return config;
 }
 
 error_t TppBackend::setup_unary(
@@ -549,150 +599,6 @@ error_t TppBackend::setup_binary(
     }
 
     return error_t::success;
-}
-
-std::tuple<
-    error_t,
-    dtype_t,
-    prim_t,
-    prim_t,
-    prim_t,
-    std::vector<dim_t>,
-    std::vector<exec_t>,
-    std::vector<int64_t>,
-    std::vector<std::vector<std::vector<int64_t>>>
-> TppBackend::optimize(
-    dtype_t dtype,
-    prim_t prim_first,
-    prim_t prim_main,
-    prim_t prim_last,
-    std::vector<dim_t> const & dim_types,
-    std::vector<exec_t> const & exec_types,
-    std::vector<int64_t> const & dim_sizes,
-    std::vector<std::vector<std::vector<int64_t>>> const & strides,
-    TppOptimizationConfig const & optimization_config
-) {
-    std::vector<std::vector<std::vector<int64_t>>> l_empty_strides;
-
-    // Extract optimization parameters from config
-    int64_t l_target_m            = optimization_config.target_m;
-    int64_t l_target_n            = optimization_config.target_n;
-    int64_t l_target_k            = optimization_config.target_k;
-    bool    l_packed_gemm_support = optimization_config.packed_gemm_support;
-    bool    l_br_gemm_support     = optimization_config.br_gemm_support;
-    bool    l_packing_support     = optimization_config.packing_support;
-    bool    l_sfc_support         = optimization_config.sfc_support;
-    int64_t l_l2_cache_size       = optimization_config.l2_cache_size;
-
-    int64_t l_num_threads[3] = {1, 1, 1};
-    l_num_threads[0] = get_num_threads(optimization_config.num_threads);
-
-    op_type_t l_op_type = determine_op_type(prim_main);
-
-    // Validate stride dimensions based on operation type
-    size_t l_expected_tensors = (l_op_type == op_type_t::binary) ? 3 : 2;
-
-    if (l_op_type == op_type_t::undefined) {
-        return std::make_tuple(error_t::compilation_failed, dtype, prim_first,
-                               prim_main, prim_last, dim_types, exec_types,
-                               dim_sizes, l_empty_strides);
-    }
-
-    // Validate stride dimensions: must have at least level 0
-    if (strides.size() == 0) {
-        return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
-                               prim_main, prim_last, dim_types, exec_types,
-                               dim_sizes, l_empty_strides);
-    }
-
-    // Validate level 0 has correct number of tensors
-    if (strides[0].size() != l_expected_tensors) {
-        return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
-                               prim_main, prim_last, dim_types, exec_types,
-                               dim_sizes, l_empty_strides);
-    }
-
-    // Validate that level 0 has proper dimensions for each tensor
-    for (size_t t = 0; t < l_expected_tensors; ++t) {
-        if (strides[0][t].size() != dim_sizes.size()) {
-            return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
-                                   prim_main, prim_last, dim_types, exec_types,
-                                   dim_sizes, l_empty_strides);
-        }
-    }
-
-    // Extract level 0 strides
-    std::vector<int64_t> l_strides_in0 = strides[0][0];
-    std::vector<int64_t> l_strides_in1 = (l_op_type == op_type_t::binary) ? strides[0][1]
-                                                                                        : std::vector<int64_t>(dim_sizes.size(), 0);
-    std::vector<int64_t> l_strides_out = (l_op_type == op_type_t::binary) ? strides[0][2] : strides[0][1];
-
-    // Make copies of input parameters for optimization
-    std::vector<dim_t> l_opt_dim_types = dim_types;
-    std::vector<exec_t> l_opt_exec_types = exec_types;
-    std::vector<int64_t> l_opt_dim_sizes = dim_sizes;
-    std::vector<int64_t> l_opt_strides_in0 = l_strides_in0;
-    std::vector<int64_t> l_opt_strides_in1 = l_strides_in1;
-    std::vector<int64_t> l_opt_strides_out = l_strides_out;
-    std::vector<int64_t> l_opt_packing_in0;
-    std::vector<int64_t> l_opt_packing_in1;
-    prim_t l_opt_prim_main = prim_main;
-
-    error_t l_err = error_t::success;
-
-    if (l_op_type == op_type_t::unary) {
-        // Unary optimization
-        l_err = optimize_unary(dtype, l_opt_prim_main, l_opt_dim_types, l_opt_exec_types,
-                               l_opt_dim_sizes, l_opt_strides_in0, l_opt_strides_out,
-                               l_num_threads[0]);
-    } else {
-        // Binary optimization
-        l_err = optimize_binary(dtype, l_opt_prim_main, l_opt_dim_types, l_opt_exec_types,
-                                l_opt_dim_sizes, l_opt_strides_in0, l_opt_strides_in1,
-                                l_opt_strides_out, l_opt_packing_in0, l_opt_packing_in1,
-                                l_target_m, l_target_n, l_target_k, l_num_threads,
-                                l_packed_gemm_support, l_br_gemm_support, l_packing_support,
-                                l_sfc_support, l_l2_cache_size);
-    }
-
-    if (l_err != error_t::success) {
-        return std::make_tuple(l_err, dtype, prim_first, l_opt_prim_main, prim_last,
-                               l_opt_dim_types, l_opt_exec_types, l_opt_dim_sizes, l_empty_strides);
-    }
-
-    // Build output 3D strides with [LEVEL][TENSOR][DIMENSION] order
-    std::vector<std::vector<std::vector<int64_t>>> opt_strides;
-
-    if (l_op_type == op_type_t::binary) {
-        // Check if packing strides are all zero
-        bool l_has_packing = false;
-        for (size_t i = 0; i < l_opt_packing_in0.size() && !l_has_packing; ++i) {
-            if (l_opt_packing_in0[i] != 0 || l_opt_packing_in1[i] != 0) {
-                l_has_packing = true;
-            }
-        }
-
-        if (l_has_packing) {
-            // Return with 2 levels: level 0 (primary) and level 1 (packing)
-            opt_strides = {
-                {l_opt_strides_in0, l_opt_strides_in1, l_opt_strides_out},  // level 0
-                {l_opt_packing_in0, l_opt_packing_in1, std::vector<int64_t>(l_opt_strides_out.size(), 0)}  // level 1 (out has no packing)
-            };
-        } else {
-            // Return with single level only
-            opt_strides = {
-                {l_opt_strides_in0, l_opt_strides_in1, l_opt_strides_out}  // level 0
-            };
-        }
-    } else {
-        // Unary: single level only
-        opt_strides = {
-            {l_opt_strides_in0, l_opt_strides_out}  // level 0
-        };
-    }
-
-    return std::make_tuple(l_err, dtype, prim_first, l_opt_prim_main, prim_last,
-                           l_opt_dim_types, l_opt_exec_types, l_opt_dim_sizes, opt_strides);
 }
 
 error_t TppBackend::optimize_unary(

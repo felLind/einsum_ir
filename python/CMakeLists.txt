@@ -40,14 +40,27 @@ file(
 # ------------------------------------------------------------
 # tpp_mlir
 # ------------------------------------------------------------
-message(STATUS "Including tpp_mlir from ${MLIR_TPP_DIR}")
+message(STATUS "Including tpp_mlir from ${TPP_MLIR_DIR}")
+message(STATUS "LLVM_DIR is set to ${LLVM_DIR}")
 
-include_directories(${MLIR_TPP_DIR}"/../api")
+set(LLVM_INCLUDE_DIR ${LLVM_DIR}/../llvm/include)
+set(LLVM_GENERATED_INCLUDE_DIR ${LLVM_DIR}/include)
+set(LLVM_INCLUDE_DIRS "${LLVM_INCLUDE_DIR};${LLVM_GENERATED_INCLUDE_DIR}")
+set(MLIR_INCLUDE_DIR ${LLVM_DIR}/../mlir/include)
+set(MLIR_GENERATED_INCLUDE_DIR ${LLVM_DIR}/tools/mlir/include)
+set(MLIR_INCLUDE_DIRS "${MLIR_INCLUDE_DIR};${MLIR_GENERATED_INCLUDE_DIR}")
+set(LLVM_BUILD_LIBRARY_DIR ${LLVM_DIR}/lib)
+set(TPP_MLIR_API_DIR ${TPP_MLIR_DIR}/../api)
+
+include_directories(${LLVM_INCLUDE_DIRS})
+include_directories(${MLIR_INCLUDE_DIRS})
+include_directories(${TPP_MLIR_API_DIR})
+link_directories(${LLVM_BUILD_LIBRARY_DIR})
 
 find_library(
     Einsum-API
     NAMES Einsum-API
-    PATHS ${MLIR_TPP_DIR}/lib
+    PATHS ${TPP_MLIR_DIR}/lib
     REQUIRED
 )
 
@@ -59,7 +72,13 @@ add_library(Einsum-API INTERFACE)
 set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 CONFIG REQUIRED)
 
-add_library(TensorOperation STATIC src/TensorOperation.cpp)
+add_library(TensorOperation 
+    STATIC 
+    src/TensorOperation.cpp
+    src/BackendFactory.cpp
+    src/TppBackend.cpp
+    src/TppMlirBackend.cpp)
+
 target_link_libraries(TensorOperation PUBLIC einsum_ir Einsum-API)
 target_include_directories(
     TensorOperation

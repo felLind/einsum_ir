@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <tuple>
+#include <memory>
 
 namespace einsum_ir {
 namespace py {

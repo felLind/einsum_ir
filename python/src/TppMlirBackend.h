@@ -16,22 +16,22 @@ private:
     std::unique_ptr<mlir::einsum::BinaryContraction> m_binary_contraction;
 
     // Type conversion methods from TensorOperation types to binary types
-    static mlir::einsum::data_t convert_dtype(TensorOperation::dtype_t dtype);
-    static mlir::einsum::kernel_t convert_prim(TensorOperation::prim_t prim);
-    static mlir::einsum::exec_t convert_exec(TensorOperation::exec_t exec);
-    static mlir::einsum::dim_t convert_dim(TensorOperation::dim_t dim);
+    static mlir::einsum::data_t convert_dtype(dtype_t dtype);
+    static mlir::einsum::kernel_t convert_prim(prim_t prim);
+    static mlir::einsum::exec_t convert_exec(exec_t exec);
+    static mlir::einsum::dim_t convert_dim(dim_t dim);
 
 public:
     TppMlirBackend() = default;
     virtual ~TppMlirBackend() = default;
 
-    virtual TensorOperation::error_t setup(
-        TensorOperation::dtype_t dtype,
-        TensorOperation::prim_t prim_first,
-        TensorOperation::prim_t prim_main,
-        TensorOperation::prim_t prim_last,
-        std::vector<TensorOperation::dim_t> const & dim_types,
-        std::vector<TensorOperation::exec_t> const & exec_types,
+    virtual error_t setup(
+        dtype_t dtype,
+        prim_t prim_first,
+        prim_t prim_main,
+        prim_t prim_last,
+        std::vector<dim_t> const & dim_types,
+        std::vector<exec_t> const & exec_types,
         std::vector<int64_t> const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides
     ) override;
@@ -43,22 +43,22 @@ public:
     ) override;
 
     virtual std::tuple<
-        TensorOperation::error_t,
-        TensorOperation::dtype_t,
-        TensorOperation::prim_t,
-        TensorOperation::prim_t,
-        TensorOperation::prim_t,
-        std::vector<TensorOperation::dim_t>,
-        std::vector<TensorOperation::exec_t>,
+        error_t,
+        dtype_t,
+        prim_t,
+        prim_t,
+        prim_t,
+        std::vector<dim_t>,
+        std::vector<exec_t>,
         std::vector<int64_t>,
         std::vector<std::vector<std::vector<int64_t>>>
     > optimize(
-        TensorOperation::dtype_t dtype,
-        TensorOperation::prim_t prim_first,
-        TensorOperation::prim_t prim_main,
-        TensorOperation::prim_t prim_last,
-        std::vector<TensorOperation::dim_t> const & dim_types,
-        std::vector<TensorOperation::exec_t> const & exec_types,
+        dtype_t dtype,
+        prim_t prim_first,
+        prim_t prim_main,
+        prim_t prim_last,
+        std::vector<dim_t> const & dim_types,
+        std::vector<exec_t> const & exec_types,
         std::vector<int64_t> const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides,
         OptimizationConfig const & optimization_config
