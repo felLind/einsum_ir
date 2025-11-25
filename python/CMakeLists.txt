@@ -50,23 +50,14 @@ set(MLIR_INCLUDE_DIR ${LLVM_DIR}/../mlir/include)
 set(MLIR_GENERATED_INCLUDE_DIR ${LLVM_DIR}/tools/mlir/include)
 set(MLIR_INCLUDE_DIRS "${MLIR_INCLUDE_DIR};${MLIR_GENERATED_INCLUDE_DIR}")
 set(LLVM_BUILD_LIBRARY_DIR ${LLVM_DIR}/lib)
-set(TPP_MLIR_API_DIR ${TPP_MLIR_DIR}/../api)
+set(TPP_MLIR_API_DIR ${TPP_MLIR_DIR}/api)
+set(TPP_MLIR_LIB_DIR ${TPP_MLIR_DIR}/build/lib)
 
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${TPP_MLIR_API_DIR})
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
-
-find_library(
-    Einsum-API
-    NAMES Einsum-API
-    PATHS ${TPP_MLIR_DIR}/build/lib
-    REQUIRED
-)
-
-add_library(Einsum-API INTERFACE)
-
-message(STATUS "Einsum-API found at ${Einsum-API}")
+link_directories(${TPP_MLIR_LIB_DIR})
 
 # ------------------------------------------------------------
 # Sources & target
@@ -93,7 +84,7 @@ if(ETOPS_USE_OPENMP)
 endif()
 
 pybind11_add_module(_etops_core MODULE src/bindings.cpp)
-target_link_libraries(_etops_core PRIVATE TensorOperation Einsum-API)
+target_link_libraries(_etops_core PRIVATE TensorOperation)
 
 if(APPLE)
     set_target_properties(
