@@ -55,9 +55,12 @@ set(TPP_MLIR_LIB_DIR ${TPP_MLIR_DIR}/build/lib)
 
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
-include_directories(${TPP_MLIR_API_DIR})
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
-link_directories(${TPP_MLIR_LIB_DIR})
+
+add_library(Einsum-API STATIC IMPORTED)
+set_target_properties(Einsum-API PROPERTIES IMPORTED_LOCATION ${TPP_MLIR_LIB_DIR}/libEinsum-API.so)
+set_target_properties(Einsum-API PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${TPP_MLIR_API_DIR})
+
 
 # ------------------------------------------------------------
 # Sources & target
