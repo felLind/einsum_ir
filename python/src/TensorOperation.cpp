@@ -87,7 +87,8 @@ std::tuple<
   einsum_ir::py::OptimizationConfig const & optimization_config
 ) {
   // Create temporary backend for optimization
-  auto temp_backend = BackendFactory::create_backend(backend);
+  // currently always use tpp for opmtimization
+  auto temp_backend = BackendFactory::create_backend("tpp");
   if (!temp_backend) {
     // Unsupported backend
     std::vector<std::vector<std::vector<int64_t>>> empty_strides;
@@ -106,7 +107,7 @@ std::tuple<
 
 einsum_ir::py::OptimizationConfig einsum_ir::py::TensorOperation::get_default_optimization_config(std::string const & backend) {
   // Create temporary backend for getting default config
-  auto temp_backend = BackendFactory::create_backend(backend);
+  auto temp_backend = BackendFactory::create_backend("tpp");
   if (!temp_backend) {
     return OptimizationConfig(); // Empty dict for unsupported backend
   }

@@ -293,43 +293,6 @@ class TensorOperation(_CppOp):
         if config is not None:
             config.apply(self)
 
-# Backend namespace
-class _TPPBackend:
-    """TPP (Tensor Processing Primitives) backend for tensor operations."""
-    name: str = "tpp"
-
-    @staticmethod
-    def get_default_optimization_config() -> Dict[str, Union[int, bool]]:
-        """Get default optimization configuration for TPP backend.
-
-        Returns:
-            Dictionary with keys:
-            - target_m (int): Target M block size.
-            - target_n (int): Target N block size.
-            - target_k (int): Target K block size.
-            - num_threads (int): Number of threads.
-            - packed_gemm_support (bool): Packed GEMM support.
-            - br_gemm_support (bool): Batch-reduce GEMM support.
-            - packing_support (bool): Packing support.
-            - sfc_support (bool): SFC support.
-            - l2_cache_size (int): L2 cache size in bytes (default: 1048576)
-        """
-        return _CppOp.get_default_optimization_config("tpp")
-
-class _TPPMlirBackend:
-    """TPP-MLIR backend for tensor operations."""
-    name: str = "tpp-mlir"
-
-    @staticmethod
-    def get_default_optimization_config() -> Dict[str, Union[int, bool]]:
-        """Get default optimization configuration for TPP-MLIR backend."""
-        return _CppOp.get_default_optimization_config("tpp-mlir")
-
-class backend:
-    """Namespace for available backends."""
-    tpp = _TPPBackend()
-    tpp_mlir = _TPPMlirBackend()
-
 def optimize(
     config: TensorOperationConfig,
     optimization_config: Optional[Dict[str, Union[int, bool]]] = None
@@ -365,12 +328,7 @@ def optimize(
 
     # Get default config if not provided
     if optimization_config is None:
-        if actual_backend == "tpp":
-            optimization_config = backend.tpp.get_default_optimization_config()
-        elif actual_backend == "tpp-mlir":
-            optimization_config = backend.tpp_mlir.get_default_optimization_config()
-        else:
-            raise ValueError(f"Unknown backend: {actual_backend}")
+        optimization_config = _CppOp.get_default_optimization_config(actual_backend)
 
     # Call C++ optimize
     result = _CppOp.optimize(
