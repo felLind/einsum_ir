@@ -165,6 +165,9 @@ PYBIND11_MODULE(_etops_core, m) {
           "sfc_support", "l2_cache_size"
         };
 
+        // set all execTypes to seq
+        std::vector<einsum_ir::py::exec_t> default_exec_types(exec_types.size(), einsum_ir::py::exec_t::seq);
+
         try {
           // Check for unknown keys
           for (auto item : optimization_config_dict) {
@@ -226,7 +229,7 @@ PYBIND11_MODULE(_etops_core, m) {
           prim_main,
           prim_last,
           dim_types,
-          exec_types,
+          default_exec_types,
           dim_sizes,
           strides,
           l_optimization_config
