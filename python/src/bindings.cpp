@@ -73,6 +73,9 @@ PYBIND11_MODULE(_etops_core, m) {
         if (compiler_config_dict.contains("grid")) {
             l_compiler_config.grid = compiler_config_dict["grid"].cast<std::vector<unsigned>>();
         }
+        if (compiler_config_dict.contains("debug_log")) {
+            l_compiler_config.debugLog = compiler_config_dict["debug_log"].cast<bool>();
+        }
 
         // Call new TensorOperation setup with backend parameter
         return self.setup(backend, dtype, prim_first, prim_main, prim_last,

@@ -82,6 +82,7 @@ struct CompilerConfig {
     std::string feature;
     unsigned optLevel;
     std::vector<unsigned> grid;
+    bool debugLog = false;
 }; 
 
 /**
