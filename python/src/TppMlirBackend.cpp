@@ -83,6 +83,7 @@ error_t TppMlirBackend::setup(
         compilerConfig.grid.begin(),
         compilerConfig.grid.end()
     );
+    options.debugLog = compilerConfig.debugLog;
 
     try {
         m_binary_contraction = std::make_unique<mlir::einsum::BinaryContraction>(config, options);
