@@ -57,11 +57,26 @@ PYBIND11_MODULE(_etops_core, m) {
         std::vector<einsum_ir::py::dim_t>            const & dim_types,
         std::vector<einsum_ir::py::exec_t>           const & exec_types,
         std::vector<int64_t>                           const & dim_sizes,
-        std::vector<std::vector<std::vector<int64_t>>> const & strides
+        std::vector<std::vector<std::vector<int64_t>>> const & strides,
+        py::dict                                       const & compiler_config_dict = py::dict()
       ) -> einsum_ir::py::error_t {
+        // Parse the Python dict and create CompilerConfig struct
+        einsum_ir::py::CompilerConfig l_compiler_config;
+        if (compiler_config_dict.contains("opt_level")){
+            l_compiler_config.optLevel = compiler_config_dict["opt_level"].cast<unsigned>();
+        } else {
+            l_compiler_config.optLevel = 2; // Default optimization level
+        }
+        if (compiler_config_dict.contains("feature")) {
+            l_compiler_config.feature = compiler_config_dict["feature"].cast<std::string>();
+        }
+        if (compiler_config_dict.contains("grid")) {
+            l_compiler_config.grid = compiler_config_dict["grid"].cast<std::vector<unsigned>>();
+        }
+
         // Call new TensorOperation setup with backend parameter
         return self.setup(backend, dtype, prim_first, prim_main, prim_last,
-                         dim_types, exec_types, dim_sizes, strides);
+                         dim_types, exec_types, dim_sizes, strides, l_compiler_config);
       },
       R"doc(
         Setup for a unary tensor operation or a binary tensor contraction.
@@ -108,7 +123,8 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("dim_types"),
       py::arg("exec_types"),
       py::arg("dim_sizes"),
-      py::arg("strides")
+      py::arg("strides"),
+      py::arg("compiler_config_dict")
     )
     .def(
       "execute",

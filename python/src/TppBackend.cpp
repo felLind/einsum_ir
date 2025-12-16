@@ -203,7 +203,8 @@ error_t TppBackend::setup(
     std::vector<dim_t> const & dim_types,
     std::vector<exec_t> const & exec_types,
     std::vector<int64_t> const & dim_sizes,
-    std::vector<std::vector<std::vector<int64_t>>> const & strides
+    std::vector<std::vector<std::vector<int64_t>>> const & strides,
+    CompilerConfig compilerConfig
 ) {
     m_op_type = determine_op_type(prim_main);
 

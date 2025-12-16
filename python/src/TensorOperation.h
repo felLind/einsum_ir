@@ -53,7 +53,8 @@ class einsum_ir::py::TensorOperation {
       std::vector<dim_t> const & dim_types,
       std::vector<exec_t> const & exec_types,
       std::vector<int64_t> const & dim_sizes,
-      std::vector<std::vector<std::vector<int64_t>>> const & strides
+      std::vector<std::vector<std::vector<int64_t>>> const & strides,
+      CompilerConfig compilerConfig = CompilerConfig()
     );
 
     /**

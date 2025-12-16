@@ -17,7 +17,8 @@ einsum_ir::py::error_t einsum_ir::py::TensorOperation::setup(
   std::vector<dim_t> const & dim_types,
   std::vector<exec_t> const & exec_types,
   std::vector<int64_t> const & dim_sizes,
-  std::vector<std::vector<std::vector<int64_t>>> const & strides
+  std::vector<std::vector<std::vector<int64_t>>> const & strides,
+  CompilerConfig compilerConfig
 ) {
   // Create the appropriate backend
   m_backend_interface = BackendFactory::create_backend(backend);
@@ -29,7 +30,7 @@ einsum_ir::py::error_t einsum_ir::py::TensorOperation::setup(
   
   // Forward to backend
   return m_backend_interface->setup(dtype, prim_first, prim_main, prim_last,
-                                   dim_types, exec_types, dim_sizes, strides);
+                                   dim_types, exec_types, dim_sizes, strides, compilerConfig);
 }
 
 // Legacy setup method for backwards compatibility (uses "tpp" backend)

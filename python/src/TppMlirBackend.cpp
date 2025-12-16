@@ -52,7 +52,8 @@ error_t TppMlirBackend::setup(
     std::vector<dim_t> const & dim_types,
     std::vector<exec_t> const & exec_types,
     std::vector<int64_t> const & dim_sizes,
-    std::vector<std::vector<std::vector<int64_t>>> const & strides
+    std::vector<std::vector<std::vector<int64_t>>> const & strides,
+    CompilerConfig compilerConfig
 ) {
     // Create binary configuration using mapper methods
     mlir::einsum::iter_config config;
@@ -75,8 +76,16 @@ error_t TppMlirBackend::setup(
     config.sizes = dim_sizes;
     config.strides = strides;
 
+    mlir::einsum::CompilerOptions options;
+    options.feature = compilerConfig.feature;
+    options.optLevel = compilerConfig.optLevel;
+    options.parallelTaskGrid = std::vector<unsigned>(
+        compilerConfig.grid.begin(),
+        compilerConfig.grid.end()
+    );
+
     try {
-        m_binary_contraction = std::make_unique<mlir::einsum::BinaryContraction>(config);
+        m_binary_contraction = std::make_unique<mlir::einsum::BinaryContraction>(config, options);
         return error_t::success;
     } catch (...) {
         return error_t::compilation_failed;

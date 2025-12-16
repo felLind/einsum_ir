@@ -258,7 +258,7 @@ class TensorOperationConfig:
                     f"etops.prim.relu, got {self.prim_last}."
                 )
 
-    def apply(self, op: _CppOp) -> None:
+    def apply(self, op: _CppOp, compiler_config: Optional[Dict[str, Union[int, bool, str, Sequence[int]]]] = None) -> None:
         """
         Apply this configuration to a TensorOperation instance.
         Args:
@@ -275,13 +275,16 @@ class TensorOperationConfig:
             tuple(self.dim_types),
             tuple(self.exec_types),
             tuple(self.dim_sizes),
-            tuple(tuple(tuple(tensor) for tensor in level) for level in self.strides)
+            tuple(tuple(tuple(tensor) for tensor in level) for level in self.strides),
+            compiler_config
+
         )
         if err != ErrorType.success:
             raise RuntimeError(f"einsum_ir TensorOperation setup failed: {err}")
 
 class TensorOperation(_CppOp):
-    def __init__(self, config: Union[TensorOperationConfig, None] = None):
+    def __init__(self, config: Union[TensorOperationConfig, None] = None, 
+                 compiler_config: Optional[Dict[str, Union[int, bool, str, Sequence[int]]]] = None):
         """
         Create a new tensor operation instance.
         Args:
@@ -291,7 +294,7 @@ class TensorOperation(_CppOp):
         """
         super().__init__()
         if config is not None:
-            config.apply(self)
+            config.apply(self, compiler_config)
 
 def optimize(
     config: TensorOperationConfig,
