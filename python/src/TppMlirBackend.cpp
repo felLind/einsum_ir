@@ -79,6 +79,7 @@ error_t TppMlirBackend::setup(
     mlir::einsum::CompilerOptions options;
     options.feature = compilerConfig.feature;
     options.optLevel = compilerConfig.optLevel;
+    options.computeTaskGrid = compilerConfig.computeGrid;
     options.parallelTaskGrid = std::vector<unsigned>(
         compilerConfig.grid.begin(),
         compilerConfig.grid.end()

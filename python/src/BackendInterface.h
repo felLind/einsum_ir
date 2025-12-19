@@ -81,6 +81,7 @@ struct OptimizationConfig {
 struct CompilerConfig {
     std::string feature;
     unsigned optLevel;
+    bool computeGrid;
     std::vector<unsigned> grid;
     bool debugLog = false;
 }; 

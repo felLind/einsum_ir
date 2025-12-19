@@ -70,6 +70,9 @@ PYBIND11_MODULE(_etops_core, m) {
         if (compiler_config_dict.contains("feature")) {
             l_compiler_config.feature = compiler_config_dict["feature"].cast<std::string>();
         }
+        if (compiler_config_dict.contains("compute_grid")) {
+            l_compiler_config.computeGrid = compiler_config_dict["compute_grid"].cast<bool>();
+        }
         if (compiler_config_dict.contains("grid")) {
             l_compiler_config.grid = compiler_config_dict["grid"].cast<std::vector<unsigned>>();
         }
